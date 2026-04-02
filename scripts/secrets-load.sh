@@ -3,6 +3,11 @@
 # Run this after cloning or when your .env is missing/stale.
 # Requires: 1Password CLI (op) — https://developer.1password.com/docs/cli/get-started/
 # Run once to authenticate: op signin
+#
+# SECURE NOTE: The 1Password item is a Secure Note. The ANTHROPIC_API_KEY is expected
+# to be stored as a custom password field named "ANTHROPIC_API_KEY".
+# If the field has a different name, update the --fields value below.
+# To inspect: op item get "profile-optimizer" --vault Personal --format json
 
 set -euo pipefail
 

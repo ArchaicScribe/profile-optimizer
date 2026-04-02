@@ -3,6 +3,10 @@
 # Run this when you rotate a key and want to update the stored value.
 # Requires: 1Password CLI (op) — https://developer.1password.com/docs/cli/get-started/
 # Run once to authenticate: op signin
+#
+# SECURE NOTE: The 1Password item is a Secure Note. The ANTHROPIC_API_KEY is expected
+# to be stored as a custom password field named "ANTHROPIC_API_KEY".
+# To verify field names: op item get "profile-optimizer" --vault Personal --format json
 
 set -euo pipefail
 
@@ -30,7 +34,7 @@ if op item get "$ITEM_TITLE" --vault Personal &>/dev/null; then
 else
   echo "Creating new 1Password item: $ITEM_TITLE"
   op item create \
-    --category "API Credential" \
+    --category "Secure Note" \
     --title "$ITEM_TITLE" \
     --vault Personal \
     "ANTHROPIC_API_KEY[password]=$ANTHROPIC_API_KEY"
