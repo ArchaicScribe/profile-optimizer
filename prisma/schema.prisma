@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ProfileAudit {
+  id          String           @id @default(cuid())
+  createdAt   DateTime         @default(now())
+  source      String           // "export" | "live" | "url"
+  rawData     String           // JSON stored as string (SQLite compat)
+  auditScore  Int
+  signals     Signal[]
+  recs        Recommendation[]
+}
+
+model Signal {
+  id       String       @id @default(cuid())
+  text     String
+  type     String       // "contract_attractor" | "location_attractor" | "positive" | "neutral"
+  severity String       // "high" | "medium" | "low"
+  auditId  String
+  audit    ProfileAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+model Recommendation {
+  id       String       @id @default(cuid())
+  title    String
+  body     String
+  priority String       // "high" | "medium" | "low"
+  category String       // "keywords" | "location" | "tone" | "experience" | "skills"
+  auditId  String
+  audit    ProfileAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+model ScanRun {
+  id        String     @id @default(cuid())
+  startedAt DateTime   @default(now())
+  status    String     // "running" | "complete" | "failed"
+  matches   JobMatch[]
+}
+
+model JobMatch {
+  id         String   @id @default(cuid())
+  scannedAt  DateTime @default(now())
+  title      String
+  company    String
+  location   String
+  url        String
+  board      String   // "indeed" | "linkedin" | "levels" | "dice"
+  matchScore Int
+  fitReason  String?
+  isContract Boolean  @default(false)
+  scanRunId  String
+  scanRun    ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+}
