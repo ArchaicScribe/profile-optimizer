@@ -4,8 +4,6 @@ import { AuditProfileUseCase } from "../../../application/AuditProfileUseCase";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const useCase = new AuditProfileUseCase();
-
 // POST /api/audit
 // Accepts multipart form data with:
 //   - file: LinkedIn export ZIP (optional)
@@ -14,6 +12,7 @@ const useCase = new AuditProfileUseCase();
 // Returns: text/event-stream — streaming Claude analysis
 export async function POST(req: NextRequest) {
   try {
+    const useCase = new AuditProfileUseCase();
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const url = formData.get("url") as string | null;

@@ -5,8 +5,6 @@ import type { ScanPreferences } from "../../../domain/entities/JobMatch";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const useCase = new ScanJobsUseCase();
-
 // Default preferences oriented toward Alex's job search targets.
 // The UI lets the user override these, but they're sensible out of the box.
 const DEFAULT_PREFERENCES: ScanPreferences = {
@@ -23,6 +21,7 @@ const DEFAULT_PREFERENCES: ScanPreferences = {
 // Returns: { jobs: JobMatch[] }
 export async function POST(req: NextRequest) {
   try {
+    const useCase = new ScanJobsUseCase();
     const body = await req.json().catch(() => ({}));
     const incoming = body.preferences ?? {};
 
