@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,33 +28,33 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <header className="border-b border-border">
-          <nav className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-8">
-            <Link href="/" className="font-semibold text-lg tracking-tight">
-              Profile Optimizer
-            </Link>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link
-                href="/audit"
-                className="hover:text-foreground transition-colors"
-              >
-                Audit
+        <ThemeProvider>
+          <header className="border-b border-border">
+            <nav className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-8">
+              <Link href="/" className="font-semibold text-lg tracking-tight">
+                Profile Optimizer
               </Link>
-              <Link
-                href="/jobs"
-                className="hover:text-foreground transition-colors"
-              >
-                Job Scanner
-              </Link>
-            </div>
-          </nav>
-        </header>
-        <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
-          {children}
-        </main>
+              <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                <Link href="/audit" className="hover:text-foreground transition-colors">
+                  Audit
+                </Link>
+                <Link href="/jobs" className="hover:text-foreground transition-colors">
+                  Job Scanner
+                </Link>
+              </div>
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
+            </nav>
+          </header>
+          <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );
