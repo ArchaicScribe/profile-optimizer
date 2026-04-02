@@ -10,6 +10,8 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "cli": "tsx cli/index.ts",
+    "secrets:load": "bash scripts/secrets-load.sh",
+    "secrets:save": "bash scripts/secrets-save.sh",
     "test": "vitest"
   },
   "dependencies": {
