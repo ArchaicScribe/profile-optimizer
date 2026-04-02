@@ -117,14 +117,68 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+:root {
+  --brand: oklch(0.6 0.2 280);
+  --brand-muted: oklch(0.6 0.2 280 / 15%);
+  --brand-glow: oklch(0.6 0.2 280 / 30%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(
+      oklch(0.5 0 0 / 12%) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
+  .dark body {
+    background-image: radial-gradient(
+      oklch(1 0 0 / 4%) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(
+      135deg,
+      oklch(0.985 0 0) 0%,
+      oklch(0.75 0.15 280) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .card-hover {
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px oklch(0.6 0.2 280 / 15%);
+    border-color: oklch(0.6 0.2 280 / 40%);
+  }
+  .glow-border {
+    box-shadow: 0 0 0 1px oklch(0.6 0.2 280 / 30%),
+                0 0 16px oklch(0.6 0.2 280 / 10%);
   }
 }
