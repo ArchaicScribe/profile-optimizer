@@ -24,20 +24,21 @@ if [ -z "$ANTHROPIC_API_KEY" ] || [ "$ANTHROPIC_API_KEY" = "your_api_key_here" ]
   exit 1
 fi
 
-ITEM_TITLE="profile-optimizer"
+ITEM_TITLE="Profile-Optimizer"
 
 if op item get "$ITEM_TITLE" --vault Personal &>/dev/null; then
   echo "Updating existing 1Password item: $ITEM_TITLE"
+  # Key is stored as the note body (notesPlain)
   op item edit "$ITEM_TITLE" \
     --vault Personal \
-    "ANTHROPIC_API_KEY[password]=$ANTHROPIC_API_KEY"
+    "notesPlain=$ANTHROPIC_API_KEY"
 else
   echo "Creating new 1Password item: $ITEM_TITLE"
   op item create \
     --category "Secure Note" \
     --title "$ITEM_TITLE" \
     --vault Personal \
-    "ANTHROPIC_API_KEY[password]=$ANTHROPIC_API_KEY"
+    "notesPlain=$ANTHROPIC_API_KEY"
 fi
 
 echo "Done. Keys saved to 1Password > Personal > $ITEM_TITLE"

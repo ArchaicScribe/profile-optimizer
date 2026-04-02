@@ -12,14 +12,14 @@
 set -euo pipefail
 
 ENV_FILE="$(dirname "$0")/../.env"
-ITEM_TITLE="profile-optimizer"
+ITEM_TITLE="Profile-Optimizer"
 
 echo "Fetching secrets from 1Password > Personal > $ITEM_TITLE..."
 
+# Key is stored in the note body (notesPlain), not a custom field
 ANTHROPIC_API_KEY=$(op item get "$ITEM_TITLE" \
   --vault Personal \
-  --fields "ANTHROPIC_API_KEY" \
-  --reveal)
+  --fields "notesPlain")
 
 if [ -z "$ANTHROPIC_API_KEY" ]; then
   echo "Error: Could not retrieve ANTHROPIC_API_KEY from 1Password"
