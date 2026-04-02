@@ -1,65 +1,182 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import type { SignalSummary } from "../application/AnalyzeSignalsUseCase";
+
+function ScoreRing({ score }: { score: number }) {
+  const color =
+    score >= 75
+      ? "text-green-500"
+      : score >= 50
+      ? "text-yellow-500"
+      : "text-red-500";
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col items-center gap-1">
+      <span className={`text-5xl font-bold tabular-nums ${color}`}>{score}</span>
+      <span className="text-xs text-muted-foreground uppercase tracking-widest">
+        Recruiter Score
+      </span>
+    </div>
+  );
+}
+
+const SEVERITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
+  high: "destructive",
+  medium: "secondary",
+  low: "outline",
+};
+
+export default function Dashboard() {
+  const [summary, setSummary] = useState<SignalSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/signals")
+      .then((r) => r.json())
+      .then((data) => {
+        setSummary(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-muted-foreground">
+          Profile optimization and job signal overview.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link href="/audit">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle className="text-base">Audit Profile</CardTitle>
+              <CardDescription>
+                Upload your LinkedIn export or enter a URL to analyze recruiter
+                signals.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/jobs">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle className="text-base">Scan Jobs</CardTitle>
+              <CardDescription>
+                Search Indeed, Levels.fyi, LinkedIn, and Dice for direct-hire
+                roles at well-established companies.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
+
+      <Separator />
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading signal data...</p>
+      ) : !summary || summary.totalAudits === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              No audits yet.{" "}
+              <Link href="/audit" className="underline underline-offset-2">
+                Run your first audit
+              </Link>{" "}
+              to see signal analysis here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="flex items-center justify-center py-6">
+            <CardContent className="flex flex-col items-center gap-4">
+              <ScoreRing score={summary.latestScore} />
+              <div className="w-full space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Average (last 10)</span>
+                  <span>{summary.averageScore}</span>
+                </div>
+                <Progress value={summary.averageScore} className="h-1.5" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {summary.totalAudits} audit
+                {summary.totalAudits !== 1 ? "s" : ""} run
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Contract Attractors</CardTitle>
+              <CardDescription className="text-xs">
+                Signals drawing contract recruiters
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {summary.topContractAttractors.length === 0 ? (
+                <p className="text-xs text-muted-foreground">None detected</p>
+              ) : (
+                <ul className="space-y-2">
+                  {summary.topContractAttractors.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Badge
+                        variant={SEVERITY_VARIANT[s.severity]}
+                        className="mt-0.5 shrink-0 text-xs"
+                      >
+                        {s.severity}
+                      </Badge>
+                      <span className="text-xs">{s.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Location Signals</CardTitle>
+              <CardDescription className="text-xs">
+                Geographic signals in your profile
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {summary.topLocationAttractors.length === 0 ? (
+                <p className="text-xs text-muted-foreground">None detected</p>
+              ) : (
+                <ul className="space-y-2">
+                  {summary.topLocationAttractors.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Badge
+                        variant="outline"
+                        className="mt-0.5 shrink-0 text-xs"
+                      >
+                        {s.severity}
+                      </Badge>
+                      <span className="text-xs">{s.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
     </div>
   );
 }
