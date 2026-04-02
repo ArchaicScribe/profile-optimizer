@@ -3,10 +3,22 @@ import type { JobMatch, ScanPreferences } from "../../domain/entities/JobMatch";
 
 // LinkedIn job listings are publicly accessible without authentication.
 // This scraper uses their public job search endpoint.
-// NOTE: This may conflict with LinkedIn's ToS. Use at your own discretion.
-// The parser falls back gracefully if blocked.
+//
+// IMPORTANT: LinkedIn's ToS prohibits automated scraping. This scraper is included
+// as a technical demonstration only. It is DISABLED by default and requires explicit
+// opt-in via ENABLE_LINKEDIN_SCRAPER=true in your .env file.
+//
+// By enabling this, you accept full responsibility for compliance with LinkedIn's
+// Terms of Service. The project authors assume no liability.
 export class LinkedInJobsScraper implements IJobScanner {
   async scan(prefs: ScanPreferences): Promise<JobMatch[]> {
+    if (process.env.ENABLE_LINKEDIN_SCRAPER !== "true") {
+      throw new Error(
+        "LinkedIn scraping is disabled. Set ENABLE_LINKEDIN_SCRAPER=true in .env to opt in. " +
+          "See README for ToS implications before enabling."
+      );
+    }
+
     const jobs: JobMatch[] = [];
 
     for (const keyword of prefs.roleKeywords.slice(0, 2)) {

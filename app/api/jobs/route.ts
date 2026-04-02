@@ -24,9 +24,18 @@ const DEFAULT_PREFERENCES: ScanPreferences = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
+    const incoming = body.preferences ?? {};
+
+    // Strip "linkedin" from any client-supplied boards array unless the operator
+    // has explicitly opted in. This enforces the gate at the API boundary
+    // regardless of what the client sends.
+    if (Array.isArray(incoming.boards) && process.env.ENABLE_LINKEDIN_SCRAPER !== "true") {
+      incoming.boards = incoming.boards.filter((b: string) => b !== "linkedin");
+    }
+
     const prefs: ScanPreferences = {
       ...DEFAULT_PREFERENCES,
-      ...(body.preferences ?? {}),
+      ...incoming,
     };
 
     const jobs = await useCase.scan(prefs);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -50,6 +50,14 @@ export default function JobsPage() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
+  const [linkedinEnabled, setLinkedinEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => setLinkedinEnabled(cfg.linkedinEnabled === true))
+      .catch(() => {});
+  }, []);
 
   const handleBoardToggle = (board: JobBoard) => {
     setPrefs((p) => ({
@@ -80,7 +88,7 @@ export default function JobsPage() {
     }
   };
 
-  const allBoards: JobBoard[] = ["indeed", "linkedin", "levels", "dice"];
+  const allBoards: JobBoard[] = ["indeed", "levels", "dice", "linkedin"];
 
   return (
     <div className="space-y-8">
@@ -165,20 +173,41 @@ export default function JobsPage() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Job Boards</label>
             <div className="flex flex-wrap gap-2">
-              {allBoards.map((board) => (
-                <button
-                  key={board}
-                  onClick={() => handleBoardToggle(board)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    prefs.boards.includes(board)
-                      ? "bg-foreground text-background border-foreground"
-                      : "border-border text-muted-foreground hover:border-foreground"
-                  }`}
-                >
-                  {BOARD_LABELS[board]}
-                </button>
-              ))}
+              {allBoards.map((board) => {
+                const isLinkedIn = board === "linkedin";
+                const locked = isLinkedIn && !linkedinEnabled;
+                return (
+                  <button
+                    key={board}
+                    onClick={() => !locked && handleBoardToggle(board)}
+                    disabled={locked}
+                    title={
+                      locked
+                        ? "LinkedIn scraping is disabled. Set ENABLE_LINKEDIN_SCRAPER=true in .env to opt in. See README for ToS implications."
+                        : undefined
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      locked
+                        ? "border-border text-muted-foreground/40 cursor-not-allowed"
+                        : prefs.boards.includes(board)
+                        ? "bg-foreground text-background border-foreground"
+                        : "border-border text-muted-foreground hover:border-foreground"
+                    }`}
+                  >
+                    {BOARD_LABELS[board]}
+                    {locked && " (opt-in)"}
+                  </button>
+                );
+              })}
             </div>
+            {!linkedinEnabled && (
+              <p className="text-xs text-muted-foreground">
+                LinkedIn Jobs requires{" "}
+                <code className="font-mono">ENABLE_LINKEDIN_SCRAPER=true</code> in{" "}
+                <code className="font-mono">.env</code>. See README for ToS
+                implications before enabling.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

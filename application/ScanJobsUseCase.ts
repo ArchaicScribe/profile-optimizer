@@ -6,11 +6,16 @@ import { JobRankerAgent } from "../infrastructure/ai/agents/JobRankerAgent";
 import { prisma } from "../infrastructure/db/PrismaClient";
 import type { JobMatch, ScanPreferences } from "../domain/entities/JobMatch";
 
-const SCRAPERS = {
+// LinkedIn scraper is only registered when explicitly opted in.
+// This means even if "linkedin" is somehow passed in a boards array,
+// it resolves to undefined and is skipped — no request is made.
+const SCRAPERS: Partial<Record<string, new () => { scan: (prefs: ScanPreferences) => Promise<JobMatch[]> }>> = {
   indeed: IndeedScraper,
   levels: LevelsFyiScraper,
-  linkedin: LinkedInJobsScraper,
   dice: DiceScraper,
+  ...(process.env.ENABLE_LINKEDIN_SCRAPER === "true"
+    ? { linkedin: LinkedInJobsScraper }
+    : {}),
 };
 
 export class ScanJobsUseCase {
