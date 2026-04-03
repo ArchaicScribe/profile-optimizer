@@ -13,6 +13,7 @@ interface AuditResult {
   signals: Array<{ text: string; type: string; severity: string }>;
   recommendations: Array<{ title: string; body: string; priority: string; category: string }>;
   summary: string;
+  phrasesToAvoid?: Array<{ phrase: string; reason: string; context: string }>;
 }
 
 const PRIORITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
@@ -307,6 +308,48 @@ export default function AuditPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Phrases to Avoid */}
+          {result.phrasesToAvoid && result.phrasesToAvoid.length > 0 && (
+            <>
+              <Separator className="opacity-50" />
+              <div className="space-y-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Phrases to Avoid ({result.phrasesToAvoid.length})
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  These words and phrases attract staffing agencies, contract recruiters, or undesired geographic matches. Remove or rephrase them.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {result.phrasesToAvoid.map((p, i) => {
+                    const contextColor =
+                      p.context === "staffing_agency"
+                        ? "border-destructive/30 bg-destructive/5"
+                        : p.context === "geographic"
+                        ? "border-yellow-500/30 bg-yellow-500/5"
+                        : "border-border/60 bg-card/40";
+                    const labelColor =
+                      p.context === "staffing_agency"
+                        ? "text-destructive"
+                        : p.context === "geographic"
+                        ? "text-yellow-500"
+                        : "text-muted-foreground";
+                    return (
+                      <div key={i} className={`rounded-lg border p-3 ${contextColor}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <code className="text-xs font-mono font-semibold break-all">{p.phrase}</code>
+                          <span className={`text-[10px] font-medium uppercase tracking-wide shrink-0 ${labelColor}`}>
+                            {p.context.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{p.reason}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}

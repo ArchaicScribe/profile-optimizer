@@ -17,13 +17,15 @@ Output structured analysis with:
 - An overall score (0-100, where 100 = ideal for attracting well-established company direct-hire roles)
 - A list of signals with type (contract_attractor | location_attractor | positive | neutral) and severity (high | medium | low)
 - Prioritized recommendations with category (keywords | location | tone | experience | skills)
+- A list of phrases to avoid: specific words, phrases, or patterns that attract staffing agencies, contract mills, or undesired geographic recruiters. Group them by context (staffing_agency | geographic | general).
 
 Format your response as valid JSON matching this schema:
 {
   "auditScore": number,
   "signals": [{ "text": string, "type": string, "severity": string }],
   "recommendations": [{ "title": string, "body": string, "priority": string, "category": string }],
-  "summary": string
+  "summary": string,
+  "phrasesToAvoid": [{ "phrase": string, "reason": string, "context": string }]
 }`;
 
 export class ProfileAuditorAgent implements IAuditAgent {
@@ -61,7 +63,7 @@ Return your analysis as JSON matching the schema specified in your instructions.
       `## Profile Data`,
       `Headline: ${data.headline ?? "(none)"}`,
       `Location: ${data.location ?? "(none)"}`,
-      `Open to Work: ${data.openToWork ? "YES — this is a red flag for contract mills" : "No"}`,
+      `Open to Work: ${data.openToWork ? "YES - this is a red flag for contract mills" : "No"}`,
       `Summary: ${data.summary ?? "(none)"}`,
       "",
       "## Positions",
