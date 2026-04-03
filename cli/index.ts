@@ -99,7 +99,7 @@ program
     console.log(`Found ${jobs.length} match(es):\n`);
     jobs.forEach((job, i) => {
       console.log(
-        `${i + 1}. [${job.matchScore}] ${job.title} — ${job.company} (${job.location})`
+        `${i + 1}. [${job.matchScore}] ${job.title} - ${job.company} (${job.location})`
       );
       console.log(`   ${job.url}`);
       if (job.fitReason) console.log(`   ${job.fitReason}`);

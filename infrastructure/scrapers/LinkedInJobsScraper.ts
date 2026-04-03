@@ -31,7 +31,7 @@ export class LinkedInJobsScraper implements IJobScanner {
             `[LinkedInJobsScraper] Failed for "${keyword}" in "${location}":`,
             err
           );
-          // Graceful degradation — other scrapers will still run
+          // Graceful degradation - other scrapers will still run
         }
       }
     }

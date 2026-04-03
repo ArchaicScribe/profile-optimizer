@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, SearchX, ExternalLink, FileText, ChevronDown, ChevronUp, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, SearchX, ExternalLink, FileText, ChevronDown, ChevronUp, RefreshCw, CheckCircle2, XCircle, HelpCircle, BookOpen } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -208,9 +209,48 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
   );
 }
 
+function PrepButton({ jobTitle, company, jdSummary }: { jobTitle: string; company: string; jdSummary?: string }) {
+  const router = useRouter();
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    setError(null);
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/study", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobTitle, company, jdSummary }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      router.push(`/prep/${data.guide.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate guide");
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={generate}
+        disabled={generating}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[oklch(0.6_0.2_280/40%)] text-[oklch(0.7_0.15_280)] px-3 py-1.5 text-xs font-medium hover:bg-[oklch(0.6_0.2_280/8%)] disabled:opacity-50 transition-colors"
+      >
+        {generating ? <><Loader2 size={12} className="animate-spin" />Generating guide...</> : <><BookOpen size={12} />Prep for Interview</>}
+      </button>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
   const [jd, setJd] = useState("");
   const [goals, setGoals] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
   const [open, setOpen] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<JDAnalysis | null>(null);
@@ -261,6 +301,29 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
       {open && (
         <CardContent className="pt-0 space-y-4">
           <Separator className="opacity-50" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Job title <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <input
+                type="text"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="e.g., Senior Software Engineer"
+                className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Company <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g., Stripe"
+                className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
+              />
+            </div>
+          </div>
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Paste the job description</label>
@@ -366,14 +429,15 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                 )}
               </div>
 
-              <div className="pt-1">
+              <div className="flex items-center gap-4 pt-1 flex-wrap">
                 <button
                   onClick={() => setShowResponse((v) => !v)}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showResponse ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  {showResponse ? "Hide" : "Draft a response"}
+                  {showResponse ? "Hide response" : "Draft a response"}
                 </button>
+                <PrepButton jobTitle={jobTitle || "this role"} company={company || "this company"} jdSummary={analysis.summary} />
               </div>
 
               {showResponse && (
@@ -608,7 +672,9 @@ export default function JobsPage() {
                     </button>
 
                     {isExpanded && (
-                      <div className="px-5 pb-5 pt-2 border-t border-border/40">
+                      <div className="px-5 pb-5 pt-2 border-t border-border/40 space-y-4">
+                        <PrepButton jobTitle={job.title} company={job.company} jdSummary={job.fitReason} />
+                        <Separator className="opacity-40" />
                         <ResponseGenerator
                           jobTitle={job.title}
                           company={job.company}

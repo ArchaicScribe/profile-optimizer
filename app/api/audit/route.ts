@@ -9,7 +9,7 @@ export const maxDuration = 60;
 //   - file: LinkedIn export ZIP (optional)
 //   - url:  Personal site URL to audit (optional, used standalone or alongside export)
 //   - siteUrl: Personal site URL to include alongside an export audit
-// Returns: text/event-stream — streaming Claude analysis
+// Returns: text/event-stream - streaming Claude analysis
 export async function POST(req: NextRequest) {
   try {
     const useCase = new AuditProfileUseCase();

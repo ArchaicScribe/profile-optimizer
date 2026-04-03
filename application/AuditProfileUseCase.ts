@@ -25,7 +25,7 @@ export class AuditProfileUseCase {
         // Strip HTML tags for cleaner analysis
         siteContent = siteContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       } catch {
-        // Non-fatal — audit continues without site content
+        // Non-fatal - audit continues without site content
       }
     }
 

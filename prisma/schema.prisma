@@ -35,6 +35,30 @@ model Recommendation {
   audit    ProfileAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
+model StudyGuide {
+  id          String          @id @default(cuid())
+  createdAt   DateTime        @default(now())
+  jobTitle    String
+  company     String
+  jdSummary   String?
+  chatHistory String          @default("[]") // JSON array of {role, content} messages
+  questions   StudyQuestion[]
+}
+
+model StudyQuestion {
+  id             String      @id @default(cuid())
+  guideId        String
+  guide          StudyGuide  @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  category       String      // "dsa" | "system_design" | "sql" | "ai_ml" | "company_specific"
+  difficulty     String      // "easy" | "medium" | "hard"
+  topic          String
+  prompt         String
+  hints          String      @default("[]") // JSON array of hint strings
+  status         String      @default("unanswered") // "unanswered" | "got_it" | "struggled"
+  reviewCount    Int         @default(0)
+  lastReviewedAt DateTime?
+}
+
 model ScanRun {
   id        String     @id @default(cuid())
   startedAt DateTime   @default(now())

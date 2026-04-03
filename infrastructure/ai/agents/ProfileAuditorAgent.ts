@@ -11,7 +11,7 @@ When auditing, analyze:
 2. LOCATION signals that may attract regional recruiters
 3. TONE and framing that positions the candidate as a contractor vs. employee
 4. MISSING signals that would attract top-tier companies (FAANG-adjacent, product companies, Series B+)
-5. EXPERIENCE framing — NDA work is fine, but how it's described matters
+5. EXPERIENCE framing - NDA work is fine, but how it's described matters
 
 Output structured analysis with:
 - An overall score (0-100, where 100 = ideal for attracting well-established company direct-hire roles)

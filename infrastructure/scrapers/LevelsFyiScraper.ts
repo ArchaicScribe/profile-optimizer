@@ -2,7 +2,7 @@ import type { IJobScanner } from "../../domain/ports/IJobScanner";
 import type { JobMatch, ScanPreferences } from "../../domain/entities/JobMatch";
 
 // Levels.fyi has an undocumented JSON API used by their web app.
-// Only well-established companies post here — no staffing agencies.
+// Only well-established companies post here - no staffing agencies.
 // This scraper fetches from their public job listings endpoint.
 export class LevelsFyiScraper implements IJobScanner {
   private readonly BASE_URL = "https://www.levels.fyi/jobs";

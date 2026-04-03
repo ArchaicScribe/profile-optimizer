@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reads secrets from 1Password and writes them to .env.
 # Run this after cloning or when your .env is missing/stale.
-# Requires: 1Password CLI (op) — https://developer.1password.com/docs/cli/get-started/
+# Requires: 1Password CLI (op) - https://developer.1password.com/docs/cli/get-started/
 # Run once to authenticate: op signin
 #
 # SECURE NOTE: The 1Password item is a Secure Note. The ANTHROPIC_API_KEY is expected
