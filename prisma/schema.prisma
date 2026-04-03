@@ -46,17 +46,30 @@ model StudyGuide {
 }
 
 model StudyQuestion {
-  id             String      @id @default(cuid())
+  id             String            @id @default(cuid())
   guideId        String
-  guide          StudyGuide  @relation(fields: [guideId], references: [id], onDelete: Cascade)
-  category       String      // "dsa" | "system_design" | "sql" | "ai_ml" | "company_specific"
-  difficulty     String      // "easy" | "medium" | "hard"
+  guide          StudyGuide        @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  category       String            // "dsa" | "system_design" | "sql" | "ai_ml" | "company_specific"
+  difficulty     String            // "easy" | "medium" | "hard"
   topic          String
   prompt         String
-  hints          String      @default("[]") // JSON array of hint strings
-  status         String      @default("unanswered") // "unanswered" | "got_it" | "struggled"
-  reviewCount    Int         @default(0)
+  hints          String            @default("[]") // JSON array of hint strings
+  status         String            @default("unanswered") // "unanswered" | "got_it" | "struggled"
+  reviewCount    Int               @default(0)
   lastReviewedAt DateTime?
+  attempts       QuestionAttempt[]
+}
+
+model QuestionAttempt {
+  id         String        @id @default(cuid())
+  createdAt  DateTime      @default(now())
+  questionId String
+  question   StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  guideId    String
+  answerText String
+  aiFeedback String?       // AI evaluation: what was right, what was missing, what to improve
+  score      Int?          // 0-100 AI-assigned score
+  status     String        // "got_it" | "struggled"
 }
 
 model ScanRun {

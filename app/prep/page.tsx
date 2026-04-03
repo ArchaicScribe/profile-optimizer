@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, TrendingUp, AlertTriangle, Clock, ChevronRight } from "lucide-react";
+import { BookOpen, TrendingUp, AlertTriangle, Clock, ChevronRight, Library } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -47,11 +47,19 @@ export default function PrepPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight gradient-text">Interview Prep</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Your saved study guides. Open any guide to practice questions and chat with the AI tutor.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight gradient-text">Interview Prep</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Your saved study guides. Open any guide to practice questions and chat with the AI tutor.
+          </p>
+        </div>
+        <Link
+          href="/prep/bank"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[oklch(0.6_0.2_280/40%)] text-[oklch(0.7_0.15_280)] px-3 py-2 text-xs font-medium hover:bg-[oklch(0.6_0.2_280/8%)] transition-colors"
+        >
+          <Library size={13} /> Question Bank
+        </Link>
       </div>
 
       {loading ? (
