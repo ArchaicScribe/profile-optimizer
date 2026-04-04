@@ -1,20 +1,27 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
+import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
-const SYSTEM_PROMPT = `You are a senior staff engineer and interview coach with deep knowledge of:
-- Data structures and algorithms (LeetCode-style problems)
-- Large-scale system design
-- SQL and database design
-- AI/ML concepts and applications
-- Company-specific interview cultures and question patterns
+function buildSystemPrompt(goalsContext: string): string {
+  return `You are a senior staff engineer and Solutions Engineering interview coach with deep expertise in:
+- System design at scale (distributed systems, data platforms, cloud architecture)
+- Pre-sales and solutions architecture scenarios
+- SQL and database design for enterprise workloads
+- AI/ML concepts, MLOps, and applied AI for platform companies
+- Company-specific interview cultures at FAANG, Snowflake, Databricks, Stripe, Datadog, and similar
 
-Your job is to produce a structured interview prep guide tailored to a specific job and company.
+${goalsContext}
+
+Your job is to produce a structured interview prep guide tailored to SE/SA roles at top-tier tech companies.
+Weight questions toward system design, architecture trade-offs, cloud platform depth, and pre-sales technical scenarios.
+DSA should reflect what SE/SA interviews actually test (graph traversal, tree problems, SQL window functions) - not pure LeetCode grind.
 Be specific, practical, and opinionated. Include real problem types, not vague advice.
 Do not use em-dashes. Return valid JSON only.`;
+}
 
 // GET /api/study - list all saved guides
 export async function GET() {
@@ -56,6 +63,10 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "jobTitle and company are required." }, { status: 400 });
     }
 
+    const config = await getUserConfig();
+    const goalsContext = buildGoalsContext(config);
+    const systemPrompt = buildSystemPrompt(goalsContext);
+
     const claude = ClaudeClient.getInstance();
 
     const userMessage = `Generate a comprehensive interview prep guide for the following role.
@@ -63,6 +74,7 @@ export async function POST(req: NextRequest) {
 Job Title: ${jobTitle}
 Company: ${company}
 ${jdSummary ? `Job context: ${jdSummary}` : ""}
+Candidate background: ${config.keyBackground}
 
 Return a JSON object with this exact structure:
 {
@@ -104,15 +116,16 @@ Return a JSON object with this exact structure:
 
 Requirements:
 - 5-7 questions per section (fewer for sql and ai_ml if not relevant to the role)
-- DSA: focus on patterns this company is known to ask (arrays, graphs, DP, etc.)
-- System design: real scenarios relevant to this company's scale and product domain
-- SQL: practical database problems (window functions, complex joins, query optimization)
-- AI/ML: concepts, ML system design, and applied AI questions relevant to the role
-- Company-specific: behavioral questions tied to the company's values/culture, plus any known question patterns
+- DSA: focus on patterns SE/SA interviews actually test at ${company} - graph/tree problems, SQL-adjacent, moderate complexity. Avoid pure competitive programming grind.
+- System design: real architecture scenarios at ${company}'s scale - data pipelines, multi-tenant SaaS, distributed ingestion, API design, reliability trade-offs
+- SQL: practical problems (window functions, complex joins, query optimization, schema design for analytical workloads)
+- AI/ML: ML system design, feature engineering, model deployment, applied AI for ${company}'s product domain
+- Company-specific: SE/SA behavioral questions tied to ${company}'s values, customer scenario walkthroughs, known patterns for their interview loop
+- Tailor all questions to the SE/SA role - emphasize architecting for others, customer-facing scenarios, trade-off justification
 - Make prompts feel like real interview questions, not textbook definitions`;
 
     let accumulated = "";
-    for await (const chunk of claude.streamText(SYSTEM_PROMPT, userMessage)) {
+    for await (const chunk of claude.streamText(systemPrompt, userMessage)) {
       accumulated += chunk;
     }
 

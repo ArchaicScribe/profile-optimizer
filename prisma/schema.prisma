@@ -35,6 +35,17 @@ model Recommendation {
   audit    ProfileAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
+model UserConfig {
+  id              String   @id @default("singleton")
+  updatedAt       DateTime @updatedAt
+  targetRole      String   @default("Solutions Engineer")
+  targetCompanies String   @default("[]") // JSON array e.g. ["Snowflake","Databricks","Google"]
+  currentRole     String   @default("Senior Software Engineer")
+  yearsExperience Int      @default(6)
+  keyBackground   String   @default("") // narrative context injected into all AI prompts
+  avoidContext    String   @default("") // things to de-emphasize (e.g. federal experience)
+}
+
 model StudyGuide {
   id          String          @id @default(cuid())
   createdAt   DateTime        @default(now())

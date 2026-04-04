@@ -1,23 +1,29 @@
 import { ClaudeClient } from "../ClaudeClient";
 import type { IAuditAgent, ParsedLinkedInData } from "../../../domain/ports/IAuditAgent";
+import { getUserConfig, buildGoalsContext } from "../../db/getUserConfig";
 
-const SYSTEM_PROMPT = `You are a senior career strategist and technical recruiter analyst.
-Your job is to audit LinkedIn profiles and personal websites, identifying signals that
-attract the wrong type of recruiters (contract roles, staffing agencies, NM/low-quality
-matches) versus well-established technology companies.
+function buildSystemPrompt(goalsContext: string): string {
+  return `You are a senior career strategist specializing in helping software engineers transition into Solutions Engineer (SE) and Solutions Architect (SA) roles at top-tier technology companies (FAANG, Snowflake, Databricks, Stripe, Datadog, Cloudflare, etc.).
+
+${goalsContext}
+
+Your job is to audit LinkedIn profiles and personal websites for signals that help or hurt this specific transition. You are not auditing for generic job-seeking -- you are evaluating positioning for SE/SA roles at high-caliber tech companies.
 
 When auditing, analyze:
-1. KEYWORDS that attract contract mills (e.g., "available", "open to work", government/defense contractor language)
-2. LOCATION signals that may attract regional recruiters
-3. TONE and framing that positions the candidate as a contractor vs. employee
-4. MISSING signals that would attract top-tier companies (FAANG-adjacent, product companies, Series B+)
-5. EXPERIENCE framing - NDA work is fine, but how it's described matters
+1. SOLO CONTRIBUTOR FRAMING - Language like "independently built/designed/implemented" signals an IC who works alone. SE/SA roles require collaboration, customer engagement, and cross-functional influence. Flag this.
+2. ADVISORY AND CONSULTING SIGNALS - Evidence of explaining complex systems to non-technical stakeholders, architecting solutions for others, leading technical direction. These are gold for SE/SA.
+3. CLIENT AND CUSTOMER FACING EXPERIENCE - Any evidence of working with external customers, running demos, participating in sales cycles, writing proposals or architecture docs.
+4. SYSTEM DESIGN BREADTH - Evidence of designing at scale, making trade-off decisions, working across multiple systems rather than deep in one codebase.
+5. CLOUD AND PLATFORM DEPTH - Specific cloud services, platform expertise relevant to target companies (e.g., data platform experience for Snowflake/Databricks).
+6. ENTERPRISE CREDIBILITY - Experience with enterprise-scale systems, security, compliance, observability, which matters to SE/SA buyers at target companies.
+7. TONE AND POSITIONING - Does the profile read like a builder or an advisor? SE/SA candidates need to read as trusted technical advisors, not implementers.
+8. MISSING SIGNALS - What would make this profile dramatically stronger for the target role.
 
 Output structured analysis with:
-- An overall score (0-100, where 100 = ideal for attracting well-established company direct-hire roles)
+- An overall score (0-100, where 100 = ideal SE/SA candidate for target companies)
 - A list of signals with type (contract_attractor | location_attractor | positive | neutral) and severity (high | medium | low)
 - Prioritized recommendations with category (keywords | location | tone | experience | skills)
-- A list of phrases to avoid: specific words, phrases, or patterns that attract staffing agencies, contract mills, or undesired geographic recruiters. Group them by context (staffing_agency | geographic | general).
+- A list of phrases to avoid: words and patterns that undercut SE/SA positioning. Group by context (solo_contributor | implementation_speak | staffing_agency | geographic | general).
 
 Format your response as valid JSON matching this schema:
 {
@@ -27,6 +33,7 @@ Format your response as valid JSON matching this schema:
   "summary": string,
   "phrasesToAvoid": [{ "phrase": string, "reason": string, "context": string }]
 }`;
+}
 
 export class ProfileAuditorAgent implements IAuditAgent {
   private claude = ClaudeClient.getInstance();
@@ -35,32 +42,43 @@ export class ProfileAuditorAgent implements IAuditAgent {
     data: ParsedLinkedInData,
     siteContent?: string
   ): Promise<AsyncIterable<string>> {
-    const userMessage = this.buildExportMessage(data, siteContent);
-    return this.claude.streamText(SYSTEM_PROMPT, userMessage);
+    const config = await getUserConfig();
+    const goalsContext = buildGoalsContext(config);
+    const systemPrompt = buildSystemPrompt(goalsContext);
+    const userMessage = this.buildExportMessage(data, siteContent, config.targetCompanies);
+    return this.claude.streamText(systemPrompt, userMessage);
   }
 
   async auditFromUrl(url: string): Promise<AsyncIterable<string>> {
-    const userMessage = `Please audit the personal/portfolio website at this URL for recruiter signal optimization: ${url}
+    const config = await getUserConfig();
+    const goalsContext = buildGoalsContext(config);
+    const systemPrompt = buildSystemPrompt(goalsContext);
+
+    const userMessage = `Please audit the personal/portfolio website at this URL for SE/SA positioning at top-tier tech companies: ${url}
+
+Target companies: ${config.targetCompanies.join(", ")}
 
 Focus on:
-- How the candidate positions themselves (contractor vs. direct-hire employee)
-- Keywords present that might attract the wrong recruiter pool
-- What's missing that would attract well-established tech companies
-- Location signals
+- Whether the candidate reads as a trusted technical advisor vs. an implementer
+- Evidence of system design thinking, customer-facing work, cross-functional collaboration
+- Keywords and framing that help or hurt SE/SA candidacy at the target companies
+- What is missing that would dramatically strengthen this profile for SE/SA roles
 
-Return your analysis as JSON matching the schema specified in your instructions.`;
+Return your analysis as JSON matching the schema in your instructions.`;
 
-    return this.claude.streamText(SYSTEM_PROMPT, userMessage);
+    return this.claude.streamText(systemPrompt, userMessage);
   }
 
   private buildExportMessage(
     data: ParsedLinkedInData,
-    siteContent?: string
+    siteContent?: string,
+    targetCompanies: string[] = []
   ): string {
     const parts = [
-      "Please audit the following LinkedIn profile data for recruiter signal optimization.",
+      "Please audit the following LinkedIn profile for SE/SA positioning at top-tier tech companies.",
+      `Target companies: ${targetCompanies.join(", ")}`,
       "",
-      `## Profile Data`,
+      "## Profile Data",
       `Headline: ${data.headline ?? "(none)"}`,
       `Location: ${data.location ?? "(none)"}`,
       `Open to Work: ${data.openToWork ? "YES - this is a red flag for contract mills" : "No"}`,
@@ -69,7 +87,7 @@ Return your analysis as JSON matching the schema specified in your instructions.
       "## Positions",
       ...data.positions.map(
         (p) =>
-          `- ${p.title} at ${p.company} (${p.startDate ?? "?"} – ${p.endDate ?? "present"})\n  ${p.description ?? ""}`
+          `- ${p.title} at ${p.company} (${p.startDate ?? "?"} to ${p.endDate ?? "present"})\n  ${p.description ?? ""}`
       ),
       "",
       "## Skills",

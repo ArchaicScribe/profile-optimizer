@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ScanSearch, FileSearch, BookOpen } from "lucide-react";
+import { LayoutDashboard, ScanSearch, FileSearch, BookOpen, Settings } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/audit", label: "Audit", icon: FileSearch },
   { href: "/jobs", label: "Job Scanner", icon: ScanSearch },
   { href: "/prep", label: "Prep", icon: BookOpen },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function NavLinks() {
