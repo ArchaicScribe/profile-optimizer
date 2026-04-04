@@ -6,9 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 
 const SUGGESTED_COMPANIES = [
-  "Snowflake", "Databricks", "Google", "Meta", "Amazon", "Microsoft",
-  "Stripe", "Cloudflare", "Datadog", "HashiCorp", "MongoDB", "Elastic",
-  "Confluent", "dbt Labs", "Palantir", "Figma", "Notion", "Linear",
+  // Seattle core
+  "Amazon", "Microsoft", "Google", "Meta", "Apple",
+  "Tableau", "Salesforce", "Expedia", "T-Mobile", "Zillow", "F5 Networks",
+  // Data / Cloud platform
+  "Snowflake", "Databricks", "Confluent", "dbt Labs", "MongoDB",
+  // Infrastructure / DevOps
+  "HashiCorp", "Datadog", "Cloudflare", "Elastic", "Dynatrace",
+  // Fintech / SaaS
+  "Stripe", "Palantir", "Figma", "Notion", "Linear",
 ];
 
 interface Config {

@@ -305,7 +305,7 @@ export default function AuditPage() {
                   <div className="flex flex-col items-center gap-2">
                     <FileText size={24} className="text-muted-foreground" />
                     <p className="text-sm font-medium">Drop your resume PDF here</p>
-                    <p className="text-xs text-muted-foreground">Analyzed for SE/SA positioning at your target companies</p>
+                    <p className="text-xs text-muted-foreground">Analyzed for SE/SA/CA/CE positioning at your target companies</p>
                   </div>
                 )}
               </div>
@@ -356,7 +356,7 @@ export default function AuditPage() {
                   <span className={`text-5xl font-bold tabular-nums ${
                     resumeResult.score >= 75 ? "text-green-500" : resumeResult.score >= 50 ? "text-yellow-500" : "text-destructive"
                   }`}>{resumeResult.score}</span>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">SE/SA Score</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">SE/SA/CA Score</span>
                 </div>
                 <div className="flex-1 space-y-2">
                   <Progress value={resumeResult.score} className="h-2" />

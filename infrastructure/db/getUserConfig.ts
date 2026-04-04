@@ -10,15 +10,15 @@ export interface UserConfig {
 }
 
 const DEFAULTS: UserConfig = {
-  targetRole: "Solutions Engineer",
-  targetCompanies: ["Snowflake", "Databricks", "Google", "Meta", "Stripe", "Cloudflare"],
+  targetRole: "Solutions Engineer / Solutions Architect / Customer Engineer",
+  targetCompanies: ["Amazon", "Microsoft", "Google", "Snowflake", "Databricks", "Salesforce"],
   currentRole: "Senior Software Engineer",
   yearsExperience: 6,
   keyBackground:
     "Enterprise Java/Spring Boot modernization specialist with 6 years at large organizations. " +
     "Strong in distributed systems, cloud-native architecture (AWS/Azure/Kubernetes), " +
-    "OAuth2/security, and production observability. Targeting SE/SA roles at top-tier tech companies.",
-  avoidContext: "Do not emphasize government, federal, or clearance experience.",
+    "OAuth2/security, and production observability. Targeting SE/SA/CA roles at Seattle-area and top-tier tech companies.",
+  avoidContext: "Do not emphasize government, federal, or clearance experience. Avoid contractor/staffing agency framing.",
 };
 
 export async function getUserConfig(): Promise<UserConfig> {
@@ -42,8 +42,10 @@ export function buildGoalsContext(config: UserConfig): string {
   return `
 ## Candidate Goals
 - Current role: ${config.currentRole} (${config.yearsExperience} years experience)
-- Target role: ${config.targetRole}
+- Target roles: ${config.targetRole}
+  (These titles are equivalent targets: Solutions Engineer, Solutions Architect, Customer Engineer, Customer Architect, Partner Architect, Technical Account Manager - senior/principal variants included)
 - Target companies: ${config.targetCompanies.join(", ")}
+  (Prioritize Seattle-area companies and remote-friendly roles at these organizations)
 - Background context: ${config.keyBackground}
 - De-emphasize: ${config.avoidContext}
 `.trim();
