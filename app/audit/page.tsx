@@ -529,8 +529,8 @@ export default function AuditPage() {
                 <div className="space-y-2">
                   {resumeResult.strengths.map((s, i) => (
                     <div key={i} className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-                      <p className="text-xs font-medium text-green-600 dark:text-green-400">{s.point}</p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{s.detail}</p>
+                      <p className="text-sm font-medium text-green-600 dark:text-green-400">{s.point}</p>
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{s.detail}</p>
                     </div>
                   ))}
                 </div>
@@ -550,9 +550,9 @@ export default function AuditPage() {
                     }`}>
                       <div className="flex items-center gap-2">
                         <Badge variant={PRIORITY_VARIANT[w.severity] ?? "outline"} className="text-xs shrink-0">{w.severity}</Badge>
-                        <p className="text-xs font-medium">{w.point}</p>
+                        <p className="text-sm font-medium">{w.point}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{w.detail}</p>
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{w.detail}</p>
                     </div>
                   ))}
                 </div>
@@ -574,14 +574,14 @@ export default function AuditPage() {
                       <CardContent className="pt-4 pb-4 space-y-3">
                         <div className="space-y-1">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Before</p>
-                          <p className="text-xs text-muted-foreground italic leading-relaxed">{r.original}</p>
+                          <p className="text-sm text-muted-foreground italic leading-relaxed">{r.original}</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-green-500">After</p>
-                          <p className="text-xs leading-relaxed">{r.rewritten}</p>
+                          <p className="text-sm leading-relaxed">{r.rewritten}</p>
                         </div>
                         <div className="rounded-md bg-muted/40 px-3 py-2">
-                          <p className="text-xs text-muted-foreground leading-relaxed">{r.reason}</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{r.reason}</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -601,8 +601,8 @@ export default function AuditPage() {
                 <div className="space-y-2">
                   {resumeResult.missing.map((m, i) => (
                     <div key={i} className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-                      <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">{m.item}</p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{m.detail}</p>
+                      <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{m.item}</p>
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{m.detail}</p>
                     </div>
                   ))}
                 </div>
@@ -616,8 +616,8 @@ export default function AuditPage() {
                 <div className="space-y-2">
                   {resumeResult.redFlags.map((f, i) => (
                     <div key={i} className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                      <p className="text-xs font-medium text-destructive">{f.flag}</p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.detail}</p>
+                      <p className="text-sm font-medium text-destructive">{f.flag}</p>
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{f.detail}</p>
                     </div>
                   ))}
                 </div>
@@ -685,10 +685,10 @@ export default function AuditPage() {
                       {s.severity}
                     </Badge>
                     <div className="min-w-0">
-                      <p className={`text-xs font-medium capitalize ${SIGNAL_TYPE_COLOR[s.type] ?? ""}`}>
+                      <p className={`text-sm font-medium capitalize ${SIGNAL_TYPE_COLOR[s.type] ?? ""}`}>
                         {s.type.replace(/_/g, " ")}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{s.text}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{s.text}</p>
                     </div>
                   </div>
                 ))}
@@ -720,7 +720,7 @@ export default function AuditPage() {
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Phrases to Avoid ({result.phrasesToAvoid.length})
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   These words and phrases attract staffing agencies, contract recruiters, or undesired geographic matches. Remove or rephrase them.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -745,7 +745,7 @@ export default function AuditPage() {
                             {p.context.replace(/_/g, " ")}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{p.reason}</p>
+                        <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{p.reason}</p>
                       </div>
                     );
                   })}

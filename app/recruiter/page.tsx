@@ -318,7 +318,7 @@ export default function RecruiterPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [jdText, setJdText] = useState("");
-  const [jdMode, setJdMode] = useState<"none" | "text" | "pdf">("none");
+  const [jdMode, setJdMode] = useState<"text" | "pdf">("pdf");
   const [analyzing, setAnalyzing] = useState(false);
   const [jdAnalysis, setJdAnalysis] = useState<JDAnalysis | null>(null);
   const [responseContext, setResponseContext] = useState<string>("");
@@ -412,7 +412,7 @@ export default function RecruiterPage() {
             <CardContent className="space-y-3">
               {/* Mode toggle */}
               <div className="flex gap-1 p-1 rounded-lg bg-muted/40 w-fit">
-                {([["none", "None"], ["pdf", "Upload PDF"], ["text", "Paste Text"]] as const).map(([mode, label]) => (
+                {([["pdf", "Upload PDF"], ["text", "Paste Text"]] as const).map(([mode, label]) => (
                   <button key={mode} onClick={() => setJdMode(mode)}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                       jdMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"

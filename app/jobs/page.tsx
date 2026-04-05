@@ -227,7 +227,7 @@ function PrepButton({ jobTitle, company, jdSummary }: { jobTitle: string; compan
       >
         {generating ? <><Loader2 size={12} className="animate-spin" />Generating guide...</> : <><BookOpen size={12} />Prep for Interview</>}
       </button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -415,7 +415,7 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
               </div>
 
               {analysis.roleVerdict && (
-                <p className="text-xs font-medium text-muted-foreground italic">{analysis.roleVerdict}</p>
+                <p className="text-sm font-medium text-muted-foreground italic">{analysis.roleVerdict}</p>
               )}
               <p className="text-sm text-muted-foreground leading-relaxed">{analysis.summary}</p>
               {analysis.recommendationReason && (
