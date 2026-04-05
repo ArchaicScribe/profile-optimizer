@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2 } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Plus, X, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -24,7 +24,16 @@ interface Config {
   yearsExperience: number;
   keyBackground: string;
   avoidContext: string;
+  activeCert: string;
+  certPath: string[];
+  certNotes: string;
 }
+
+const CERT_SUGGESTIONS = [
+  "AI-102", "AZ-305", "AZ-104", "AZ-900",
+  "DP-203", "DP-900", "SnowPro Core", "Databricks Associate",
+  "AWS SAA-C03", "AWS SAP-C02", "GCP ACE", "GCP PCA",
+];
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -185,6 +194,108 @@ export default function SettingsPage() {
                 setConfig((p) => p && { ...p, targetCompanies: [...suggested, ...custom] });
               }}
               className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator className="opacity-50" />
+
+      {/* Certification path */}
+      <Card className="border-border/60 bg-card/60">
+        <CardHeader>
+          <CardTitle className="text-base">Certification Path</CardTitle>
+          <CardDescription className="text-sm">
+            Your active cert is injected into study guides and company research so AI questions match what you are preparing for.
+            Private notes stay local and are never sent to AI.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Visual path */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Cert path (ordered)</label>
+            <div className="flex flex-wrap items-center gap-2">
+              {(config.certPath.length > 0 ? config.certPath : [""]).map((cert, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                    cert === config.activeCert
+                      ? "bg-[oklch(0.6_0.2_280)] border-transparent text-white"
+                      : "border-border/60 text-muted-foreground"
+                  }`}>
+                    {cert === config.activeCert && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
+                    )}
+                    <span>{cert || "..."}</span>
+                    <button
+                      onClick={() => setConfig((p) => p && {
+                        ...p,
+                        certPath: p.certPath.filter((_, idx) => idx !== i),
+                        activeCert: p.activeCert === cert ? (p.certPath[i + 1] ?? p.certPath[i - 1] ?? "") : p.activeCert,
+                      })}
+                      className="ml-0.5 opacity-60 hover:opacity-100"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                  {i < config.certPath.length - 1 && (
+                    <ArrowRight size={12} className="text-muted-foreground shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Add cert */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Add cert to path</label>
+            <div className="flex flex-wrap gap-1.5">
+              {CERT_SUGGESTIONS.filter((c) => !config.certPath.includes(c)).map((cert) => (
+                <button
+                  key={cert}
+                  onClick={() => setConfig((p) => p && { ...p, certPath: [...p.certPath, cert] })}
+                  className="rounded-full border border-dashed border-border/60 px-3 py-0.5 text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <Plus size={9} />
+                  {cert}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Active cert selector */}
+          {config.certPath.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Currently active (studying now)</label>
+              <div className="flex flex-wrap gap-2">
+                {config.certPath.map((cert) => (
+                  <button
+                    key={cert}
+                    onClick={() => setConfig((p) => p && { ...p, activeCert: cert })}
+                    className={`rounded-full border px-3.5 py-1 text-xs font-medium transition-all ${
+                      config.activeCert === cert
+                        ? "bg-[oklch(0.6_0.2_280)] border-transparent text-white"
+                        : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                    }`}
+                  >
+                    {cert}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Private notes */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Private notes{" "}
+              <span className="text-muted-foreground font-normal text-xs">(not sent to AI)</span>
+            </label>
+            <textarea
+              rows={2}
+              value={config.certNotes}
+              onChange={(e) => setConfig((p) => p && { ...p, certNotes: e.target.value })}
+              placeholder="e.g. exam booked for June 15, using John Savill's course..."
+              className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-y transition-shadow"
             />
           </div>
         </CardContent>

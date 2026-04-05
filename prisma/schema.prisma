@@ -44,6 +44,9 @@ model UserConfig {
   yearsExperience Int      @default(6)
   keyBackground   String   @default("") // narrative context injected into all AI prompts
   avoidContext    String   @default("") // things to de-emphasize (e.g. federal experience)
+  activeCert      String   @default("AI-102") // cert currently being studied
+  certPath        String   @default("[]") // JSON array: ordered cert plan e.g. ["AI-102","AZ-305"]
+  certNotes       String   @default("") // freeform notes (not injected into AI - private)
 }
 
 model StudyGuide {

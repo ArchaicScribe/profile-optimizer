@@ -4,15 +4,18 @@ import { prisma } from "../../../infrastructure/db/PrismaClient";
 export const runtime = "nodejs";
 
 const DEFAULT_CONFIG = {
-  targetRole: "Solutions Engineer",
-  targetCompanies: ["Snowflake", "Databricks", "Google", "Meta", "Stripe", "Cloudflare"],
+  targetRole: "Solutions Engineer / Solutions Architect / Customer Engineer",
+  targetCompanies: ["Amazon", "Microsoft", "Google", "Snowflake", "Databricks", "Salesforce"],
   currentRole: "Senior Software Engineer",
   yearsExperience: 6,
   keyBackground:
     "Enterprise Java/Spring Boot modernization specialist with 6 years at large organizations. " +
     "Strong in distributed systems, cloud-native architecture (AWS/Azure/Kubernetes), " +
-    "OAuth2/security, and production observability. Targeting SE/SA roles at top-tier tech companies.",
-  avoidContext: "Do not emphasize government, federal, or clearance experience.",
+    "OAuth2/security, and production observability. Targeting SE/SA/CA roles at Seattle-area and top-tier tech companies.",
+  avoidContext: "Do not emphasize government, federal, or clearance experience. Avoid contractor/staffing agency framing.",
+  activeCert: "AI-102",
+  certPath: ["AI-102", "AZ-305"],
+  certNotes: "",
 };
 
 // GET /api/goals - return current user config
@@ -33,6 +36,7 @@ export async function GET() {
     return Response.json({
       ...config,
       targetCompanies: JSON.parse(config.targetCompanies),
+      certPath: JSON.parse(config.certPath || "[]"),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load config";
@@ -51,6 +55,9 @@ export async function PUT(req: NextRequest) {
       yearsExperience,
       keyBackground,
       avoidContext,
+      activeCert,
+      certPath,
+      certNotes,
     } = body;
 
     const config = await prisma.userConfig.upsert({
@@ -63,6 +70,9 @@ export async function PUT(req: NextRequest) {
         yearsExperience: yearsExperience ?? DEFAULT_CONFIG.yearsExperience,
         keyBackground: keyBackground ?? DEFAULT_CONFIG.keyBackground,
         avoidContext: avoidContext ?? DEFAULT_CONFIG.avoidContext,
+        activeCert: activeCert ?? DEFAULT_CONFIG.activeCert,
+        certPath: JSON.stringify(certPath ?? DEFAULT_CONFIG.certPath),
+        certNotes: certNotes ?? DEFAULT_CONFIG.certNotes,
       },
       update: {
         ...(targetRole !== undefined && { targetRole }),
@@ -71,12 +81,16 @@ export async function PUT(req: NextRequest) {
         ...(yearsExperience !== undefined && { yearsExperience }),
         ...(keyBackground !== undefined && { keyBackground }),
         ...(avoidContext !== undefined && { avoidContext }),
+        ...(activeCert !== undefined && { activeCert }),
+        ...(certPath !== undefined && { certPath: JSON.stringify(certPath) }),
+        ...(certNotes !== undefined && { certNotes }),
       },
     });
 
     return Response.json({
       ...config,
       targetCompanies: JSON.parse(config.targetCompanies),
+      certPath: JSON.parse(config.certPath || "[]"),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save config";
