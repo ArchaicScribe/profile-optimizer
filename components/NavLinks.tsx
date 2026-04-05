@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ScanSearch, FileSearch, BookOpen, Settings } from "lucide-react";
+import { LayoutDashboard, ScanSearch, FileSearch, BookOpen, Settings, PenLine, MessageSquare, Building2 } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/audit", label: "Audit", icon: FileSearch },
-  { href: "/jobs", label: "Job Scanner", icon: ScanSearch },
+  { href: "/rewrite", label: "Rewrite", icon: PenLine },
+  { href: "/jobs", label: "Jobs", icon: ScanSearch },
   { href: "/prep", label: "Prep", icon: BookOpen },
+  { href: "/mock", label: "Mock", icon: MessageSquare },
+  { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

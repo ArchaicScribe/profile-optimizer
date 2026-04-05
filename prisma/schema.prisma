@@ -104,3 +104,11 @@ model JobMatch {
   scanRunId  String
   scanRun    ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
 }
+
+model CompanyCard {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   String   @unique
+  rawData   String   // JSON blob
+}
