@@ -1,18 +1,39 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { ProxyAgent, setGlobalDispatcher } from "undici";
+
+// Configure global proxy for Node.js fetch (used by Anthropic SDK) if running in
+// a sandboxed environment that requires egress routing through a proxy.
+const proxyUrl =
+  process.env.HTTPS_PROXY ||
+  process.env.HTTP_PROXY ||
+  process.env.GLOBAL_AGENT_HTTP_PROXY;
+
+if (proxyUrl) {
+  try {
+    setGlobalDispatcher(new ProxyAgent(proxyUrl));
+  } catch {
+    // Ignore — proxy not required in all environments (e.g. user's local machine)
+  }
+}
 
 // Singleton wrapper around the Anthropic SDK.
-// All agent classes consume this instead of instantiating the SDK directly,
-// so swapping providers later only requires changing this file.
 export class ClaudeClient {
   private static instance: ClaudeClient;
   readonly client: Anthropic;
   readonly defaultModel = "claude-sonnet-4-6";
 
   private constructor() {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
       throw new Error("ANTHROPIC_API_KEY environment variable is not set");
     }
-    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    // Session ingress tokens (sk-ant-si-*) use Bearer auth.
+    // Regular API keys (sk-ant-api-*) use x-api-key (SDK default).
+    const isSessionToken = apiKey.startsWith("sk-ant-si-");
+    this.client = isSessionToken
+      ? new Anthropic({ apiKey: null as never, authToken: apiKey })
+      : new Anthropic({ apiKey });
   }
 
   static getInstance(): ClaudeClient {
@@ -22,10 +43,7 @@ export class ClaudeClient {
     return ClaudeClient.instance;
   }
 
-  async *streamText(
-    systemPrompt: string,
-    userMessage: string
-  ): AsyncGenerator<string> {
+  async *streamText(systemPrompt: string, userMessage: string): AsyncGenerator<string> {
     const stream = await this.client.messages.stream({
       model: this.defaultModel,
       max_tokens: 4096,
@@ -34,10 +52,7 @@ export class ClaudeClient {
     });
 
     for await (const chunk of stream) {
-      if (
-        chunk.type === "content_block_delta" &&
-        chunk.delta.type === "text_delta"
-      ) {
+      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
         yield chunk.delta.text;
       }
     }
