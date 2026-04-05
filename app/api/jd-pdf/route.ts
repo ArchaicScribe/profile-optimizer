@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { extractJson } from "../../../lib/extractJson";
 
@@ -19,8 +19,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "A PDF file is required." }, { status: 400 });
     }
 
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { goalsContext } = await getGoalsContext();
 
     const systemPrompt = `You are a brutally honest career advisor helping a software engineer transition into SE/SA/CA/CE roles at top-tier tech companies. You review job descriptions and give a clear verdict on fit, flags, and recommended action.
 
@@ -62,16 +61,12 @@ Hard rules for recommendation:
 
     const claude = ClaudeClient.getInstance();
 
-    let accumulated = "";
-    for await (const chunk of claude.streamContent(
+    const text = await claude.completeContent(
       systemPrompt,
       [{ role: "user", content: [await pdfContentBlock(file), { type: "text", text: userMessage }] as never }],
       2048,
-    )) {
-      accumulated += chunk;
-    }
-
-    return Response.json({ analysis: extractJson(accumulated) });
+    );
+    return Response.json({ analysis: extractJson(text) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "JD PDF analysis failed";
     return Response.json({ error: message }, { status: 500 });

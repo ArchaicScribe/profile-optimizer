@@ -82,6 +82,24 @@ export class ClaudeClient {
     }
   }
 
+  /** Collect the full streamed text response in one call (non-streaming use cases). */
+  async complete(systemPrompt: string, userMessage: string, maxTokens = 4096): Promise<string> {
+    let result = "";
+    for await (const chunk of this.streamText(systemPrompt, userMessage, maxTokens)) result += chunk;
+    return result;
+  }
+
+  /** Same as complete() but for multimodal / multi-turn messages. */
+  async completeContent(
+    systemPrompt: string,
+    messages: Anthropic.MessageParam[],
+    maxTokens = 4096,
+  ): Promise<string> {
+    let result = "";
+    for await (const chunk of this.streamContent(systemPrompt, messages, maxTokens)) result += chunk;
+    return result;
+  }
+
   async completeWithTools<T>(
     systemPrompt: string,
     userMessage: string,

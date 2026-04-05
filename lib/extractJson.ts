@@ -1,4 +1,17 @@
 /**
+ * Parse JSON, returning the original value on failure instead of throwing.
+ * Useful for DB fields stored as JSON strings where the value might be raw text.
+ */
+export function tryParseJson<T = unknown>(value: string | null | undefined): T | string | null {
+  if (value == null || value === "") return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return value;
+  }
+}
+
+/**
  * Extract and parse the first JSON object from an LLM response string.
  *
  * Handles:

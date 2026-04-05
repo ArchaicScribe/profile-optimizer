@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { extractJson } from "../../../lib/extractJson";
 
 export const runtime = "nodejs";
@@ -70,8 +70,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "jobTitle and company are required." }, { status: 400 });
     }
 
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { config, goalsContext } = await getGoalsContext();
     const systemPrompt = buildSystemPrompt(goalsContext);
 
     const userMessage = `Generate a comprehensive interview prep guide for the following role.
@@ -116,15 +115,10 @@ Requirements:
 
     const claude = ClaudeClient.getInstance();
 
-    let accumulated = "";
-    for await (const chunk of claude.streamText(systemPrompt, userMessage)) {
-      accumulated += chunk;
-    }
-
     const parsed = extractJson<{ sections: Array<{
       category: string;
       questions: Array<{ topic: string; difficulty: string; prompt: string; hints: string[] }>;
-    }> }>(accumulated);
+    }> }>(await claude.complete(systemPrompt, userMessage));
 
     const guide = await prisma.studyGuide.create({
       data: {

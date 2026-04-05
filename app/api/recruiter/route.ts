@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { sseStream } from "../../../lib/sseStream";
 
@@ -22,8 +22,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Recruiter message is required." }, { status: 400 });
     }
 
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { goalsContext } = await getGoalsContext();
     const hasResume = file && file.name.endsWith(".pdf");
 
     const systemPrompt = `You are a career advisor helping Alex Rauenzahn evaluate recruiter outreach. Alex is a Senior Software Engineer targeting Solutions Engineer, Solutions Architect, Customer Engineer, and Customer Architect roles at Seattle-area tech companies.

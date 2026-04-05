@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
@@ -61,8 +61,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Missing required config fields." }, { status: 400 });
     }
 
-    const userConfig = await getUserConfig();
-    const goalsContext = buildGoalsContext(userConfig);
+    const { goalsContext } = await getGoalsContext();
     const systemPrompt = buildSystemPrompt(goalsContext, config);
     const conversationText = formatConversation(messages ?? []);
 

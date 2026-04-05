@@ -67,11 +67,7 @@ export async function POST(req: NextRequest) {
 
     const userMessage = parts.join("\n");
 
-    let message = "";
-    for await (const chunk of claude.streamText(SYSTEM_PROMPT, userMessage)) {
-      message += chunk;
-    }
-
+    const message = await claude.complete(SYSTEM_PROMPT, userMessage);
     return Response.json({ message: message.trim() });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate response";
