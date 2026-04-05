@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { extractJson } from "../../../lib/extractJson";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
-// GET /api/companies - return all generated company cards
+// GET /api/companies — return all generated company cards
 export async function GET() {
   try {
     const records = await prisma.companyCard.findMany({
@@ -27,7 +28,7 @@ export async function GET() {
   }
 }
 
-// POST /api/companies - generate and save a research card for a company
+// POST /api/companies — generate and save a research card for a company
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -38,7 +39,6 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmedCompany = company.trim();
-
     const config = await getUserConfig();
     const goalsContext = buildGoalsContext(config);
 
@@ -54,17 +54,17 @@ Do not use em-dashes. Return valid JSON only.`;
 Return JSON with this exact structure:
 {
   "company": string,
-  "roles": [string],  // exact job titles used at this company for SE/SA/CA/CE (e.g. "Solutions Architect", "Customer Engineer")
+  "roles": [string],
   "loopStructure": [
     { "round": string, "format": string, "focus": string, "duration": string }
   ],
-  "keySignals": [string],  // 5-7 things this company specifically looks for in SE/SA/CA candidates
-  "knownPatterns": [string],  // 5-7 known question patterns or topics that appear in their loops
-  "techStack": [string],  // relevant AWS/Azure/GCP services and tools that come up in their SE/SA interviews
-  "whatGoodLooksLike": string,  // paragraph: what an ideal candidate answer/profile looks like to their hiring bar
-  "redFlags": [string],  // 4-5 things that kill SE/SA/CA candidacy at this company specifically
-  "insiderTips": [string],  // 4-5 specific, actionable prep tips for this company's loop
-  "cloudFocus": string  // "AWS" | "Azure" | "GCP" | "Multi-cloud" | "Agnostic" - which cloud matters most for their SE/SA interviews
+  "keySignals": [string],
+  "knownPatterns": [string],
+  "techStack": [string],
+  "whatGoodLooksLike": string,
+  "redFlags": [string],
+  "insiderTips": [string],
+  "cloudFocus": string
 }
 
 Be specific to ${trimmedCompany}. Do not give generic SE/SA interview advice.`;
@@ -76,23 +76,12 @@ Be specific to ${trimmedCompany}. Do not give generic SE/SA interview advice.`;
       fullOutput += chunk;
     }
 
-    // Strip markdown code fences if present
-    const cleaned = fullOutput
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/, "")
-      .trim();
-
-    const parsed = JSON.parse(cleaned);
+    const parsed = extractJson(fullOutput);
 
     const saved = await prisma.companyCard.upsert({
       where: { company: trimmedCompany },
-      create: {
-        company: trimmedCompany,
-        rawData: JSON.stringify(parsed),
-      },
-      update: {
-        rawData: JSON.stringify(parsed),
-      },
+      create: { company: trimmedCompany, rawData: JSON.stringify(parsed) },
+      update: { rawData: JSON.stringify(parsed) },
     });
 
     return Response.json({

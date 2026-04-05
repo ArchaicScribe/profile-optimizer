@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -66,31 +67,7 @@ export async function POST(req: NextRequest) {
     const conversationText = formatConversation(messages ?? []);
 
     const claude = ClaudeClient.getInstance();
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of claude.streamText(systemPrompt, conversationText)) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk })}\n\n`));
-          }
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Interview generation failed";
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`));
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return sseStream(claude.streamText(systemPrompt, conversationText));
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }

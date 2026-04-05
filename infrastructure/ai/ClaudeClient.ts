@@ -43,12 +43,36 @@ export class ClaudeClient {
     return ClaudeClient.instance;
   }
 
-  async *streamText(systemPrompt: string, userMessage: string): AsyncGenerator<string> {
+  async *streamText(
+    systemPrompt: string,
+    userMessage: string,
+    maxTokens = 4096,
+  ): AsyncGenerator<string> {
     const stream = await this.client.messages.stream({
       model: this.defaultModel,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+        yield chunk.delta.text;
+      }
+    }
+  }
+
+  /** Stream a multi-turn or multimodal conversation (e.g. PDF document blocks). */
+  async *streamContent(
+    systemPrompt: string,
+    messages: Anthropic.MessageParam[],
+    maxTokens = 4096,
+  ): AsyncGenerator<string> {
+    const stream = await this.client.messages.stream({
+      model: this.defaultModel,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages,
     });
 
     for await (const chunk of stream) {

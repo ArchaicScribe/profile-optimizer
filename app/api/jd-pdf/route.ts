@@ -1,14 +1,20 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { pdfContentBlock } from "../../../lib/pdfToBase64";
+import { extractJson } from "../../../lib/extractJson";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
+// POST /api/jd-pdf
+// Accepts multipart form data with: file (JD PDF, required)
+// Returns: { analysis: JDAnalysis }
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
+
     if (!file || !file.name.endsWith(".pdf")) {
       return Response.json({ error: "A PDF file is required." }, { status: 400 });
     }
@@ -54,37 +60,18 @@ Hard rules for recommendation:
 - "inquire" if fitScore 40-64 or locationMatch is false
 - "apply" only if fitScore >= 65 and no hard disqualifiers`;
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const base64 = buffer.toString("base64");
-
     const claude = ClaudeClient.getInstance();
 
     let accumulated = "";
-    const stream = await claude.client.messages.stream({
-      model: claude.defaultModel,
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-          { type: "text", text: userMessage },
-        ],
-      }],
-    });
-
-    for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-        accumulated += chunk.delta.text;
-      }
+    for await (const chunk of claude.streamContent(
+      systemPrompt,
+      [{ role: "user", content: [await pdfContentBlock(file), { type: "text", text: userMessage }] as never }],
+      2048,
+    )) {
+      accumulated += chunk;
     }
 
-    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return Response.json({ error: "Analysis failed - no JSON returned." }, { status: 500 });
-    }
-
-    return Response.json({ analysis: JSON.parse(jsonMatch[0]) });
+    return Response.json({ analysis: extractJson(accumulated) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "JD PDF analysis failed";
     return Response.json({ error: message }, { status: 500 });

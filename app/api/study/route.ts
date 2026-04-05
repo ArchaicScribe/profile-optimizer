@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { extractJson } from "../../../lib/extractJson";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -29,7 +30,7 @@ Be specific, practical, and opinionated. Include real problem types, not vague a
 Do not use em-dashes. Return valid JSON only.`;
 }
 
-// GET /api/study - list all saved guides
+// GET /api/study — list all saved guides
 export async function GET() {
   try {
     const guides = await prisma.studyGuide.findMany({
@@ -54,7 +55,7 @@ export async function GET() {
   }
 }
 
-// POST /api/study - generate a new study guide
+// POST /api/study — generate a new study guide
 // Body: { jobTitle: string, company: string, jdSummary?: string }
 export async function POST(req: NextRequest) {
   try {
@@ -72,8 +73,6 @@ export async function POST(req: NextRequest) {
     const config = await getUserConfig();
     const goalsContext = buildGoalsContext(config);
     const systemPrompt = buildSystemPrompt(goalsContext);
-
-    const claude = ClaudeClient.getInstance();
 
     const userMessage = `Generate a comprehensive interview prep guide for the following role.
 
@@ -97,33 +96,17 @@ Return a JSON object with this exact structure:
         }
       ]
     },
-    {
-      "category": "system_design",
-      "title": "System Design",
-      "questions": [...]
-    },
-    {
-      "category": "sql",
-      "title": "SQL & Databases",
-      "questions": [...]
-    },
-    {
-      "category": "ai_ml",
-      "title": "AI & Machine Learning",
-      "questions": [...]
-    },
-    {
-      "category": "company_specific",
-      "title": "Company-Specific",
-      "questions": [...]
-    }
+    { "category": "system_design", "title": "System Design", "questions": [...] },
+    { "category": "sql", "title": "SQL & Databases", "questions": [...] },
+    { "category": "ai_ml", "title": "AI & Machine Learning", "questions": [...] },
+    { "category": "company_specific", "title": "Company-Specific", "questions": [...] }
   ]
 }
 
 Requirements:
 - 5-7 questions per section (fewer for sql and ai_ml if not relevant to the role)
 - DSA: focus on patterns SE/SA/CA interviews actually test at ${company} - graph/tree problems, SQL-adjacent, moderate complexity. No pure competitive programming.
-- System design: real architecture scenarios at ${company}'s scale. At least 2 questions must involve AWS or Azure services specifically (e.g. "design this using AWS services", "compare Azure Service Bus vs SQS for this workload"). Cover multi-region, data pipelines, distributed ingestion, API design, reliability trade-offs.
+- System design: real architecture scenarios at ${company}'s scale. At least 2 questions must involve AWS or Azure services specifically. Cover multi-region, data pipelines, distributed ingestion, API design, reliability trade-offs.
 - SQL: practical problems (window functions, complex joins, query optimization, schema design for analytical workloads)
 - AI/ML: ML system design, feature engineering, model deployment, applied AI for ${company}'s product domain
 - Company-specific: SE/SA/CA behavioral questions tied to ${company}'s values, customer scenario walkthroughs, architecture review simulations, known patterns for their interview loop
@@ -131,36 +114,32 @@ Requirements:
 - Weave AWS and Azure into system design and company-specific questions wherever realistic
 - Make prompts feel like real interview questions, not textbook definitions`;
 
+    const claude = ClaudeClient.getInstance();
+
     let accumulated = "";
     for await (const chunk of claude.streamText(systemPrompt, userMessage)) {
       accumulated += chunk;
     }
 
-    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return Response.json({ error: "Guide generation failed." }, { status: 500 });
-    }
+    const parsed = extractJson<{ sections: Array<{
+      category: string;
+      questions: Array<{ topic: string; difficulty: string; prompt: string; hints: string[] }>;
+    }> }>(accumulated);
 
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    // Persist to DB
     const guide = await prisma.studyGuide.create({
       data: {
         jobTitle,
         company,
         jdSummary: jdSummary ?? null,
         questions: {
-          create: (parsed.sections ?? []).flatMap((section: {
-            category: string;
-            questions: Array<{ topic: string; difficulty: string; prompt: string; hints: string[] }>;
-          }) =>
+          create: (parsed.sections ?? []).flatMap((section) =>
             (section.questions ?? []).map((q) => ({
               category: section.category,
               difficulty: q.difficulty,
               topic: q.topic,
               prompt: q.prompt,
               hints: JSON.stringify(q.hints ?? []),
-            }))
+            })),
           ),
         },
       },
