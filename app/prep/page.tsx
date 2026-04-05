@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, TrendingUp, AlertTriangle, Clock, ChevronRight, Library } from "lucide-react";
+import { BookOpen, TrendingUp, AlertTriangle, Clock, ChevronRight, Library, Plus, Loader2, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface GuideSummary {
   id: string;
@@ -34,7 +36,116 @@ function ProgressRing({ pct, color }: { pct: number; color: string }) {
   );
 }
 
+function NewGuideForm({ onCreated }: { onCreated: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
+  const [jdText, setJdText] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    if (!jobTitle.trim() || !company.trim()) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/study", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobTitle: jobTitle.trim(),
+          company: company.trim(),
+          jdSummary: jdText.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onCreated(data.guide.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generation failed");
+      setGenerating(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 text-xs font-medium hover:bg-[oklch(0.55_0.2_280)] transition-colors"
+      >
+        <Plus size={13} /> New Guide
+      </button>
+    );
+  }
+
+  return (
+    <Card className="border-[oklch(0.6_0.2_280/30%)] bg-card/80 w-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">New Study Guide</CardTitle>
+          <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
+            <X size={14} />
+          </button>
+        </div>
+        <CardDescription>Enter a role and company - paste the JD for more targeted questions.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Job title</label>
+            <input
+              type="text"
+              placeholder="e.g. Solutions Architect"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Company</label>
+            <input
+              type="text"
+              placeholder="e.g. Amazon"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium">
+            Job description <span className="text-muted-foreground font-normal">(optional - paste for tailored questions)</span>
+          </label>
+          <textarea
+            rows={4}
+            placeholder="Paste the full JD here..."
+            value={jdText}
+            onChange={(e) => setJdText(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-y transition-shadow"
+          />
+        </div>
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
+        )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={generate}
+            disabled={generating || !jobTitle.trim() || !company.trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-4 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+          >
+            {generating ? <><Loader2 size={13} className="animate-spin" />Generating guide...</> : "Generate Guide"}
+          </button>
+          {generating && (
+            <span className="text-xs text-muted-foreground">This takes 20-30 seconds</span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PrepPage() {
+  const router = useRouter();
   const [guides, setGuides] = useState<GuideSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,19 +158,22 @@ export default function PrepPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight gradient-text">Interview Prep</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Your saved study guides. Open any guide to practice questions and chat with the AI tutor.
           </p>
         </div>
-        <Link
-          href="/prep/bank"
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[oklch(0.6_0.2_280/40%)] text-[oklch(0.7_0.15_280)] px-3 py-2 text-xs font-medium hover:bg-[oklch(0.6_0.2_280/8%)] transition-colors"
-        >
-          <Library size={13} /> Question Bank
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/prep/bank"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[oklch(0.6_0.2_280/40%)] text-[oklch(0.7_0.15_280)] px-3 py-2 text-xs font-medium hover:bg-[oklch(0.6_0.2_280/8%)] transition-colors"
+          >
+            <Library size={13} /> Question Bank
+          </Link>
+          <NewGuideForm onCreated={(id) => router.push(`/prep/${id}`)} />
+        </div>
       </div>
 
       {loading ? (
@@ -83,15 +197,9 @@ export default function PrepPage() {
             <div>
               <p className="text-sm font-medium">No study guides yet</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Find a job on the Job Scanner page and click "Prep for Interview" to generate your first guide.
+                Click "New Guide" above to generate your first guide, or find a job on the Jobs page.
               </p>
             </div>
-            <Link
-              href="/jobs"
-              className="mt-1 rounded-md bg-foreground text-background px-4 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
-            >
-              Go to Job Scanner
-            </Link>
           </CardContent>
         </Card>
       ) : (
@@ -153,4 +261,7 @@ export default function PrepPage() {
       )}
     </div>
   );
+}
+
+
 }
