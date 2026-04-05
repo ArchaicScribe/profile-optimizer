@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, SearchX, ExternalLink, FileText, ChevronDown, ChevronUp, RefreshCw, CheckCircle2, XCircle, HelpCircle, BookOpen } from "lucide-react";
+import { Loader2, SearchX, ExternalLink, FileText, ChevronDown, ChevronUp, RefreshCw, CheckCircle2, XCircle, HelpCircle, BookOpen, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,14 +36,19 @@ const DEFAULT_PREFS: ScanPreferences = {
 interface JDAnalysis {
   overallFit: "strong" | "moderate" | "poor";
   fitScore: number;
+  roleVerdict?: string;
   summary: string;
   matches: Array<{ label: string; detail: string }>;
   concerns: Array<{ label: string; detail: string }>;
   redFlags: Array<{ label: string; detail: string }>;
   isContract: boolean;
   isStaffingAgency: boolean;
+  hasGovernmentWork?: boolean;
   locationMatch: boolean;
-  recommendation: "accept" | "inquire" | "decline";
+  recommendation: "apply" | "inquire" | "decline";
+  recommendationReason?: string;
+  missingFromProfile?: string[];
+  suggestedQuestions?: string[];
 }
 
 function ScorePill({ score }: { score: number }) {
@@ -89,15 +94,12 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [revision, setRevision] = useState("");
 
-  const generate = async (type: ResponseType, feedbackText?: string) => {
+  const generate = async (type: ResponseType, revisionText?: string) => {
     setActiveType(type);
     setGenerating(true);
     setError(null);
-    setShowFeedback(false);
-    setFeedback("");
 
     try {
       const res = await fetch("/api/response", {
@@ -108,13 +110,14 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
           jobTitle,
           company,
           jdSummary,
-          feedback: feedbackText,
-          previousMessage: feedbackText ? message : undefined,
+          feedback: revisionText,
+          previousMessage: revisionText ? message : undefined,
         }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMessage(data.message);
+      setRevision("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
     } finally {
@@ -157,49 +160,32 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
           ) : (
             <>
               <p className={`text-sm leading-relaxed whitespace-pre-wrap ${cfg.msgText}`}>{message}</p>
-              <div className="flex items-center gap-2 pt-1 border-t border-border/30">
-                {!showFeedback ? (
-                  <>
-                    <button
-                      onClick={() => generate(activeType!)}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <RefreshCw size={11} /> Regenerate
-                    </button>
-                    <span className="text-border">|</span>
-                    <button
-                      onClick={() => setShowFeedback(true)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Not quite right
-                    </button>
-                  </>
-                ) : (
-                  <div className="w-full space-y-2">
-                    <textarea
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                      placeholder="What should be different? (e.g., shorter, more assertive, ask about salary)"
-                      rows={2}
-                      className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => generate(activeType!, feedback)}
-                        disabled={!feedback.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-1.5 text-xs font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
-                      >
-                        <RefreshCw size={11} /> Regenerate with feedback
-                      </button>
-                      <button
-                        onClick={() => { setShowFeedback(false); setFeedback(""); }}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+
+              <div className="pt-2 border-t border-border/30 space-y-2">
+                <p className="text-xs text-muted-foreground">Tell the AI how to revise it:</p>
+                <textarea
+                  value={revision}
+                  onChange={(e) => setRevision(e.target.value)}
+                  placeholder='e.g. "make it shorter", "ask about remote policy", "sound less formal", "decline more firmly"'
+                  rows={2}
+                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => generate(activeType!, revision)}
+                    disabled={!revision.trim() || generating}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-1.5 text-xs font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw size={11} /> Revise
+                  </button>
+                  <button
+                    onClick={() => generate(activeType!)}
+                    disabled={generating}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <RefreshCw size={11} /> Regenerate from scratch
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -247,7 +233,10 @@ function PrepButton({ jobTitle, company, jdSummary }: { jobTitle: string; compan
 }
 
 function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
+  const [inputMode, setInputMode] = useState<"text" | "pdf">("text");
   const [jd, setJd] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfDragging, setPdfDragging] = useState(false);
   const [goals, setGoals] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
@@ -263,14 +252,24 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
     setShowResponse(false);
     setAnalyzing(true);
     try {
-      const res = await fetch("/api/jd", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jd, preferences: prefs, goals }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setAnalysis(data.analysis);
+      if (inputMode === "pdf") {
+        if (!pdfFile) throw new Error("Please upload a JD PDF.");
+        const form = new FormData();
+        form.append("file", pdfFile);
+        const res = await fetch("/api/jd-pdf", { method: "POST", body: form });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setAnalysis(data.analysis);
+      } else {
+        const res = await fetch("/api/jd", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jd, preferences: prefs, goals }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setAnalysis(data.analysis);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -302,52 +301,82 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
         <CardContent className="pt-0 space-y-4">
           <Separator className="opacity-50" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Job title <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <input
-                type="text"
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="e.g., Senior Software Engineer"
-                className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Company <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <input
-                type="text"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="e.g., Stripe"
-                className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
-              />
-            </div>
+          {/* Input mode toggle */}
+          <div className="flex gap-1 p-1 rounded-lg bg-muted/40 w-fit">
+            {(["text", "pdf"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => { setInputMode(mode); setAnalysis(null); setError(null); }}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  inputMode === mode
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {mode === "text" ? <FileText size={12} /> : <Upload size={12} />}
+                {mode === "text" ? "Paste Text" : "Upload PDF"}
+              </button>
+            ))}
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Paste the job description</label>
-            <textarea
-              value={jd}
-              onChange={(e) => setJd(e.target.value)}
-              placeholder="Paste the full job description here..."
-              rows={8}
-              className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-y transition-shadow"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Additional goals <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={goals}
-              onChange={(e) => setGoals(e.target.value)}
-              placeholder="e.g., looking for fully remote, equity-heavy comp, Series B or later"
-              className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow"
-            />
-          </div>
+          {inputMode === "text" ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Job title <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <input type="text" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="e.g., Solutions Architect"
+                    className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Company <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)}
+                    placeholder="e.g., Amazon"
+                    className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Paste the job description</label>
+                <textarea value={jd} onChange={(e) => setJd(e.target.value)}
+                  placeholder="Paste the full job description here..." rows={8}
+                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-y transition-shadow" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Additional goals <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <input type="text" value={goals} onChange={(e) => setGoals(e.target.value)}
+                  placeholder="e.g., fully remote, equity-heavy, Series B or later"
+                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow" />
+              </div>
+            </>
+          ) : (
+            <div
+              onDrop={(e) => { e.preventDefault(); setPdfDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.endsWith(".pdf")) setPdfFile(f); }}
+              onDragOver={(e) => { e.preventDefault(); setPdfDragging(true); }}
+              onDragLeave={() => setPdfDragging(false)}
+              onClick={() => document.getElementById("jd-pdf-input")?.click()}
+              className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
+                pdfDragging ? "border-[oklch(0.6_0.2_280/60%)] bg-[oklch(0.6_0.2_280/8%)]"
+                : pdfFile ? "border-green-500/40 bg-green-500/5"
+                : "border-border/60 hover:border-[oklch(0.6_0.2_280/40%)] hover:bg-[oklch(0.6_0.2_280/4%)]"
+              }`}
+            >
+              <input id="jd-pdf-input" type="file" accept=".pdf" className="hidden"
+                onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)} />
+              {pdfFile ? (
+                <div className="flex flex-col items-center gap-2">
+                  <CheckCircle2 size={24} className="text-green-500" />
+                  <p className="text-sm font-medium">{pdfFile.name}</p>
+                  <p className="text-xs text-muted-foreground">Click to replace</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Upload size={24} className="text-muted-foreground" />
+                  <p className="text-sm font-medium">Drop the JD PDF here</p>
+                  <p className="text-xs text-muted-foreground">Compared against your goals, resume, and hard preferences</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -357,7 +386,7 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
 
           <button
             onClick={analyze}
-            disabled={analyzing || jd.trim().length < 20}
+            disabled={analyzing || (inputMode === "text" ? jd.trim().length < 20 : !pdfFile)}
             className="inline-flex items-center gap-2 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-5 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
           >
             {analyzing ? <><Loader2 size={14} className="animate-spin" />Analyzing...</> : "Analyze JD"}
@@ -368,22 +397,30 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
               <Separator className="opacity-50" />
 
               {/* Fit score header */}
-              <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold ${fitColor}`}>
                   {analysis.fitScore}/100 - {analysis.overallFit.charAt(0).toUpperCase() + analysis.overallFit.slice(1)} Fit
                 </span>
-                {analysis.isContract && (
-                  <Badge variant="destructive" className="text-xs">Contract role</Badge>
-                )}
-                {analysis.isStaffingAgency && (
-                  <Badge variant="destructive" className="text-xs">Staffing agency</Badge>
-                )}
-                {!analysis.locationMatch && (
-                  <Badge variant="secondary" className="text-xs">Location mismatch</Badge>
-                )}
+                {analysis.isContract && <Badge variant="destructive" className="text-xs">Contract</Badge>}
+                {analysis.isStaffingAgency && <Badge variant="destructive" className="text-xs">Staffing agency</Badge>}
+                {analysis.hasGovernmentWork && <Badge variant="destructive" className="text-xs">Government work</Badge>}
+                {!analysis.locationMatch && <Badge variant="secondary" className="text-xs">Location mismatch</Badge>}
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  analysis.recommendation === "apply" ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
+                  : analysis.recommendation === "inquire" ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                  : "border-destructive/30 bg-destructive/10 text-destructive"
+                }`}>
+                  {analysis.recommendation === "apply" ? "Apply" : analysis.recommendation === "inquire" ? "Inquire first" : "Pass"}
+                </span>
               </div>
 
+              {analysis.roleVerdict && (
+                <p className="text-xs font-medium text-muted-foreground italic">{analysis.roleVerdict}</p>
+              )}
               <p className="text-sm text-muted-foreground leading-relaxed">{analysis.summary}</p>
+              {analysis.recommendationReason && (
+                <p className="text-sm leading-relaxed">{analysis.recommendationReason}</p>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {analysis.matches.length > 0 && (
@@ -428,6 +465,31 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                   </div>
                 )}
               </div>
+
+              {analysis.missingFromProfile && analysis.missingFromProfile.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gaps to Address</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {analysis.missingFromProfile.map((item, i) => (
+                      <span key={i} className="rounded-full border border-yellow-500/30 bg-yellow-500/5 px-2.5 py-0.5 text-xs text-yellow-600 dark:text-yellow-400">{item}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {analysis.suggestedQuestions && analysis.suggestedQuestions.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Questions to Ask</p>
+                  <ul className="space-y-1">
+                    {analysis.suggestedQuestions.map((q, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
+                        {q}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="flex items-center gap-4 pt-1 flex-wrap">
                 <button

@@ -7,7 +7,8 @@ export const maxDuration = 30;
 export type ResponseType = "accept" | "decline" | "inquire";
 
 const SYSTEM_PROMPT = `You are a professional career assistant helping a job seeker craft recruiter responses.
-Write concise, professional messages. Do not use em-dashes. Keep messages under 150 words.
+Write concise, professional messages. Keep messages under 150 words.
+NEVER use em-dashes (--) or en-dashes. Use commas or separate sentences instead.
 Return only the message text, no JSON wrapper, no subject line, no salutation prefix.`;
 
 const TONE_INSTRUCTIONS: Record<ResponseType, string> = {
