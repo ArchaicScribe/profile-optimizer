@@ -129,14 +129,14 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Draft a response to this recruiter:</p>
+      <p className="text-sm text-muted-foreground">Draft a response to this recruiter:</p>
       <div className="flex flex-wrap gap-2">
         {(Object.entries(RESPONSE_CONFIG) as [ResponseType, typeof RESPONSE_CONFIG[ResponseType]][]).map(([type, c]) => (
           <button
             key={type}
             onClick={() => generate(type)}
             disabled={generating}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${c.btn}`}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${c.btn}`}
           >
             {c.icon}
             {c.label}
@@ -145,7 +145,7 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
       </div>
 
       {error && (
-        <div className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-lg px-3 py-2">
+        <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-lg px-3 py-2">
           {error}
         </div>
       )}
@@ -153,8 +153,8 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
       {(generating || message) && cfg && (
         <div className={`rounded-lg border p-4 space-y-3 ${cfg.msgBg} ${cfg.msgBorder}`}>
           {generating ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 size={12} className="animate-spin" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 size={14} className="animate-spin" />
               Drafting {activeType} response...
             </div>
           ) : (
@@ -162,28 +162,28 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
               <p className={`text-sm leading-relaxed whitespace-pre-wrap ${cfg.msgText}`}>{message}</p>
 
               <div className="pt-2 border-t border-border/30 space-y-2">
-                <p className="text-xs text-muted-foreground">Tell the AI how to revise it:</p>
+                <p className="text-sm text-muted-foreground">Tell the AI how to revise it:</p>
                 <textarea
                   value={revision}
                   onChange={(e) => setRevision(e.target.value)}
                   placeholder='e.g. "make it shorter", "ask about remote policy", "sound less formal", "decline more firmly"'
                   rows={2}
-                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
+                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={() => generate(activeType!, revision)}
                     disabled={!revision.trim() || generating}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-1.5 text-xs font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
                   >
-                    <RefreshCw size={11} /> Revise
+                    <RefreshCw size={13} /> Revise
                   </button>
                   <button
                     onClick={() => generate(activeType!)}
                     disabled={generating}
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <RefreshCw size={11} /> Regenerate from scratch
+                    <RefreshCw size={13} /> Regenerate from scratch
                   </button>
                 </div>
               </div>
@@ -429,8 +429,8 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                     <ul className="space-y-1.5">
                       {analysis.matches.map((m, i) => (
                         <li key={i} className="rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
-                          <p className="text-xs font-medium">{m.label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{m.detail}</p>
+                          <p className="text-sm font-medium">{m.label}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{m.detail}</p>
                         </li>
                       ))}
                     </ul>
@@ -443,8 +443,8 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                     <ul className="space-y-1.5">
                       {analysis.concerns.map((c, i) => (
                         <li key={i} className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
-                          <p className="text-xs font-medium">{c.label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{c.detail}</p>
+                          <p className="text-sm font-medium">{c.label}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{c.detail}</p>
                         </li>
                       ))}
                     </ul>
@@ -457,8 +457,8 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                     <ul className="space-y-1.5">
                       {analysis.redFlags.map((r, i) => (
                         <li key={i} className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2">
-                          <p className="text-xs font-medium">{r.label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{r.detail}</p>
+                          <p className="text-sm font-medium">{r.label}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{r.detail}</p>
                         </li>
                       ))}
                     </ul>
@@ -482,7 +482,7 @@ function JDAnalyzer({ prefs }: { prefs: ScanPreferences }) {
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Questions to Ask</p>
                   <ul className="space-y-1">
                     {analysis.suggestedQuestions.map((q, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
                         <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
                         {q}
                       </li>
@@ -715,7 +715,7 @@ export default function JobsPage() {
                                 </a>
                               </div>
                               {job.fitReason && (
-                                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{job.fitReason}</p>
+                                <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{job.fitReason}</p>
                               )}
                             </TableCell>
                             <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{job.company}</TableCell>

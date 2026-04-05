@@ -140,7 +140,7 @@ function CompanyCardPanel({
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Interview Loop</p>
             <div className="space-y-2">
               {d.loopStructure.map((round, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-3 rounded-lg border border-border/40 bg-muted/20 px-4 py-2.5 text-xs">
+                <div key={i} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-3 rounded-lg border border-border/40 bg-muted/20 px-4 py-2.5 text-sm">
                   <span className="font-medium">{round.round}</span>
                   <span className="text-muted-foreground">{round.format}</span>
                   <span className="text-muted-foreground">{round.focus}</span>
