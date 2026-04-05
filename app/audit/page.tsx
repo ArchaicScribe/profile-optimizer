@@ -16,6 +16,14 @@ interface AuditResult {
   phrasesToAvoid?: Array<{ phrase: string; reason: string; context: string }>;
 }
 
+interface JDComparison {
+  fitScore: number;
+  verdict: string;
+  matched: string[];
+  gaps: string[];
+  tailoringTips: string[];
+}
+
 interface ResumeResult {
   score: number;
   headline: string;
@@ -25,6 +33,7 @@ interface ResumeResult {
   missing: Array<{ item: string; detail: string }>;
   redFlags: Array<{ flag: string; detail: string }>;
   nextSteps: string[];
+  jdComparison?: JDComparison;
 }
 
 const PRIORITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
@@ -83,6 +92,10 @@ export default function AuditPage() {
   const [dragging, setDragging] = useState(false);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeDragging, setResumeDragging] = useState(false);
+  const [jdFile, setJdFile] = useState<File | null>(null);
+  const [jdDragging, setJdDragging] = useState(false);
+  const [jdText, setJdText] = useState("");
+  const [jdMode, setJdMode] = useState<"pdf" | "text">("text");
   const [url, setUrl] = useState("");
   const [siteUrl, setSiteUrl] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -106,6 +119,13 @@ export default function AuditPage() {
     if (dropped?.name.endsWith(".pdf")) setResumeFile(dropped);
   }, []);
 
+  const handleJdDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setJdDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped?.name.endsWith(".pdf")) setJdFile(dropped);
+  }, []);
+
   const runAudit = async () => {
     setError(null);
     setStreamChunks([]);
@@ -121,6 +141,8 @@ export default function AuditPage() {
       }
       const form = new FormData();
       form.append("file", resumeFile);
+      if (jdMode === "pdf" && jdFile) form.append("jd", jdFile);
+      if (jdMode === "text" && jdText.trim()) form.append("jdText", jdText.trim());
       try {
         const res = await fetch("/api/resume", { method: "POST", body: form });
         if (!res.body) throw new Error("No response body");
@@ -279,33 +301,98 @@ export default function AuditPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="resume" className="space-y-4">
-              <div
-                onDrop={handleResumeDrop}
-                onDragOver={(e) => { e.preventDefault(); setResumeDragging(true); }}
-                onDragLeave={() => setResumeDragging(false)}
-                onClick={() => document.getElementById("pdf-input")?.click()}
-                className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
-                  resumeDragging
-                    ? "border-[oklch(0.6_0.2_280/60%)] bg-[oklch(0.6_0.2_280/8%)]"
-                    : resumeFile
-                    ? "border-green-500/40 bg-green-500/5"
-                    : "border-border/60 hover:border-[oklch(0.6_0.2_280/40%)] hover:bg-[oklch(0.6_0.2_280/4%)]"
-                }`}
-              >
-                <input id="pdf-input" type="file" accept=".pdf" className="hidden"
-                  onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)} />
-                {resumeFile ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <CheckCircle2 size={24} className="text-green-500" />
-                    <p className="text-sm font-medium">{resumeFile.name}</p>
-                    <p className="text-xs text-muted-foreground">Click to replace</p>
+            <TabsContent value="resume" className="space-y-5">
+              {/* Resume drop zone */}
+              <div>
+                <p className="text-sm font-medium mb-2">Resume PDF <span className="text-destructive">*</span></p>
+                <div
+                  onDrop={handleResumeDrop}
+                  onDragOver={(e) => { e.preventDefault(); setResumeDragging(true); }}
+                  onDragLeave={() => setResumeDragging(false)}
+                  onClick={() => document.getElementById("pdf-input")?.click()}
+                  className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
+                    resumeDragging
+                      ? "border-[oklch(0.6_0.2_280/60%)] bg-[oklch(0.6_0.2_280/8%)]"
+                      : resumeFile
+                      ? "border-green-500/40 bg-green-500/5"
+                      : "border-border/60 hover:border-[oklch(0.6_0.2_280/40%)] hover:bg-[oklch(0.6_0.2_280/4%)]"
+                  }`}
+                >
+                  <input id="pdf-input" type="file" accept=".pdf" className="hidden"
+                    onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)} />
+                  {resumeFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle2 size={24} className="text-green-500" />
+                      <p className="text-sm font-medium">{resumeFile.name}</p>
+                      <p className="text-xs text-muted-foreground">Click to replace</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText size={24} className="text-muted-foreground" />
+                      <p className="text-sm font-medium">Drop your resume PDF here</p>
+                      <p className="text-xs text-muted-foreground">Analyzed for SE/SA/CA/CE positioning at your target companies</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* JD section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Job Description <span className="text-muted-foreground font-normal">(optional — enables JD fit analysis)</span></p>
+                  <div className="flex items-center gap-1 rounded-lg border border-border/60 p-0.5 bg-muted/30">
+                    <button
+                      onClick={() => setJdMode("text")}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${jdMode === "text" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Paste Text
+                    </button>
+                    <button
+                      onClick={() => setJdMode("pdf")}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${jdMode === "pdf" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Upload PDF
+                    </button>
                   </div>
+                </div>
+
+                {jdMode === "text" ? (
+                  <textarea
+                    value={jdText}
+                    onChange={(e) => setJdText(e.target.value)}
+                    placeholder="Paste job description here..."
+                    rows={6}
+                    className="w-full rounded-lg border border-input bg-background/50 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow resize-y leading-relaxed"
+                  />
                 ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <FileText size={24} className="text-muted-foreground" />
-                    <p className="text-sm font-medium">Drop your resume PDF here</p>
-                    <p className="text-xs text-muted-foreground">Analyzed for SE/SA/CA/CE positioning at your target companies</p>
+                  <div
+                    onDrop={handleJdDrop}
+                    onDragOver={(e) => { e.preventDefault(); setJdDragging(true); }}
+                    onDragLeave={() => setJdDragging(false)}
+                    onClick={() => document.getElementById("jd-pdf-input")?.click()}
+                    className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                      jdDragging
+                        ? "border-[oklch(0.6_0.2_280/60%)] bg-[oklch(0.6_0.2_280/8%)]"
+                        : jdFile
+                        ? "border-green-500/40 bg-green-500/5"
+                        : "border-border/60 hover:border-[oklch(0.6_0.2_280/40%)] hover:bg-[oklch(0.6_0.2_280/4%)]"
+                    }`}
+                  >
+                    <input id="jd-pdf-input" type="file" accept=".pdf" className="hidden"
+                      onChange={(e) => setJdFile(e.target.files?.[0] ?? null)} />
+                    {jdFile ? (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <CheckCircle2 size={20} className="text-green-500" />
+                        <p className="text-sm font-medium">{jdFile.name}</p>
+                        <p className="text-xs text-muted-foreground">Click to replace</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <Upload size={20} className="text-muted-foreground" />
+                        <p className="text-sm font-medium">Drop JD PDF here</p>
+                        <p className="text-xs text-muted-foreground">or click to browse</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -365,6 +452,70 @@ export default function AuditPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* JD Comparison */}
+          {resumeResult.jdComparison && (
+            <>
+              <Separator className="opacity-50" />
+              <div className="space-y-4">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">JD Fit Analysis</h2>
+                <Card className="border-[oklch(0.6_0.2_280/30%)] bg-[oklch(0.6_0.2_280/5%)]">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="flex items-center gap-6 mb-4">
+                      <div className="flex flex-col items-center gap-0.5 shrink-0">
+                        <span className={`text-4xl font-bold tabular-nums ${
+                          resumeResult.jdComparison.fitScore >= 75 ? "text-green-500" : resumeResult.jdComparison.fitScore >= 50 ? "text-yellow-500" : "text-destructive"
+                        }`}>{resumeResult.jdComparison.fitScore}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest">JD Fit</span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Progress value={resumeResult.jdComparison.fitScore} className="h-2" />
+                        <p className="text-sm italic text-muted-foreground">{resumeResult.jdComparison.verdict}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {resumeResult.jdComparison.matched.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-green-500">Matched ({resumeResult.jdComparison.matched.length})</p>
+                          <ul className="space-y-1">
+                            {resumeResult.jdComparison.matched.map((m, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <span className="text-green-500 mt-0.5 shrink-0">✓</span>{m}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {resumeResult.jdComparison.gaps.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Gaps ({resumeResult.jdComparison.gaps.length})</p>
+                          <ul className="space-y-1">
+                            {resumeResult.jdComparison.gaps.map((g, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <span className="text-destructive mt-0.5 shrink-0">✗</span>{g}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    {resumeResult.jdComparison.tailoringTips.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tailoring Tips</p>
+                        <ul className="space-y-1.5">
+                          {resumeResult.jdComparison.tailoringTips.map((tip, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <span className="text-[oklch(0.6_0.2_280)] mt-0.5 shrink-0">→</span>{tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
 
           <Separator className="opacity-50" />
 
