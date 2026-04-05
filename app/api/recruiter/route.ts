@@ -115,7 +115,8 @@ Return valid JSON only:
         Connection: "keep-alive",
       },
     });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (e) {
+    console.error("[/api/recruiter] outer catch:", e);
+    return Response.json({ error: e instanceof Error ? e.message : "Invalid request" }, { status: 400 });
   }
 }
