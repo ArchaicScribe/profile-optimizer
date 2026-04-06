@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { consumeSSE } from "../../lib/consumeSSE";
 import { Loader2, Mic, Send, RotateCcw, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -137,32 +138,7 @@ export default function MockPage() {
         throw new Error("Request failed");
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = decoder.decode(value, { stream: true });
-        const lines = text.split("\n");
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6).trim();
-          if (raw === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed.chunk) {
-              accumulated += parsed.chunk;
-              setStreamingText(accumulated);
-            }
-          } catch {
-            // skip malformed
-          }
-        }
-      }
+      const accumulated = await consumeSSE(res, (_, acc) => setStreamingText(acc));
 
       setStreamingText("");
       setStreaming(false);

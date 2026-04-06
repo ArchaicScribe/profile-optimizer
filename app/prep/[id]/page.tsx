@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { consumeSSE } from "../../../lib/consumeSSE";
 import { use } from "react";
 import {
   CheckCircle2, XCircle, ChevronDown, ChevronUp, Lightbulb,
@@ -415,29 +416,16 @@ function TutorChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text.trim() }),
       });
-      if (!res.body) throw new Error("No stream");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const line of decoder.decode(value).split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
-          const parsed = JSON.parse(data);
-          if (parsed.chunk) {
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                role: "assistant",
-                content: updated[updated.length - 1].content + parsed.chunk,
-              };
-              return updated;
-            });
-          }
-        }
-      }
+      await consumeSSE(res, (chunk) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: updated[updated.length - 1].content + chunk,
+          };
+          return updated;
+        });
+      });
     } catch {
       setMessages((prev) => {
         const updated = [...prev];
