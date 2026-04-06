@@ -65,7 +65,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetch("/api/signals")
       .then((r) => r.json())
-      .then((data) => { setSummary(data); setLoading(false); })
+      .then((data) => { if (!data.error) setSummary(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -188,14 +188,14 @@ export default function Dashboard() {
                 <CardDescription className="text-xs">Signals drawing contract recruiters</CardDescription>
               </CardHeader>
               <CardContent>
-                {summary.topContractAttractors.length === 0 ? (
+                {(summary.topContractAttractors ?? []).length === 0 ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
                     None detected
                   </div>
                 ) : (
                   <ul className="space-y-2">
-                    {summary.topContractAttractors.map((s, i) => (
+                    {(summary.topContractAttractors ?? []).map((s, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <Badge variant={SEVERITY_VARIANT[s.severity]} className="mt-0.5 shrink-0 text-xs">
                           {s.severity}
@@ -218,14 +218,14 @@ export default function Dashboard() {
                 <CardDescription className="text-xs">Geographic signals in your profile</CardDescription>
               </CardHeader>
               <CardContent>
-                {summary.topLocationAttractors.length === 0 ? (
+                {(summary.topLocationAttractors ?? []).length === 0 ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
                     None detected
                   </div>
                 ) : (
                   <ul className="space-y-2">
-                    {summary.topLocationAttractors.map((s, i) => (
+                    {(summary.topLocationAttractors ?? []).map((s, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <Badge variant="outline" className="mt-0.5 shrink-0 text-xs">
                           {s.severity}
@@ -240,7 +240,7 @@ export default function Dashboard() {
           </div>
 
           {/* Phrases to Avoid */}
-          {summary.phrasesToAvoid.length > 0 && (
+          {(summary.phrasesToAvoid ?? []).length > 0 && (
             <Card className="border-border/60 bg-card/60">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -256,7 +256,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {summary.phrasesToAvoid.map((p, i) => {
+                  {(summary.phrasesToAvoid ?? []).map((p, i) => {
                     const pill =
                       p.context === "staffing_agency"
                         ? "border-destructive/40 text-destructive bg-destructive/5"
