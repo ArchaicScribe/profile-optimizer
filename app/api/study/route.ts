@@ -7,6 +7,9 @@ import { extractJson } from "../../../lib/extractJson";
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
+type StudyQuestion = { topic: string; difficulty: string; prompt: string; hints: string[] };
+type StudySection = { category: string; questions: StudyQuestion[] };
+
 function buildSystemPrompt(goalsContext: string): string {
   return `You are a senior Solutions Engineering interview coach with deep expertise in:
 - System design at scale (distributed systems, data platforms, cloud-native architecture)
@@ -115,10 +118,9 @@ Requirements:
 
     const claude = ClaudeClient.getInstance();
 
-    const parsed = extractJson<{ sections: Array<{
-      category: string;
-      questions: Array<{ topic: string; difficulty: string; prompt: string; hints: string[] }>;
-    }> }>(await claude.complete(systemPrompt, userMessage));
+    const parsed = extractJson<{ sections: StudySection[] }>(
+      await claude.complete(systemPrompt, userMessage),
+    );
 
     const guide = await prisma.studyGuide.create({
       data: {
@@ -126,8 +128,8 @@ Requirements:
         company,
         jdSummary: jdSummary ?? null,
         questions: {
-          create: (parsed.sections ?? []).flatMap((section) =>
-            (section.questions ?? []).map((q) => ({
+          create: (parsed.sections ?? []).flatMap((section: StudySection) =>
+            (section.questions ?? []).map((q: StudyQuestion) => ({
               category: section.category,
               difficulty: q.difficulty,
               topic: q.topic,
