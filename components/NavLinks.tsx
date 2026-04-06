@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ScanSearch, FileSearch, BookOpen, Settings, PenLine, MessageSquare, Building2, Mail, FileText } from "lucide-react";
+import { LayoutDashboard, ScanSearch, FileSearch, BookOpen, Settings, PenLine, MessageSquare, Building2, Mail, FileText, MailPlus } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const links = [
   { href: "/resume", label: "Resume", icon: FileText },
   { href: "/rewrite", label: "Rewrite", icon: PenLine },
   { href: "/recruiter", label: "Recruiter", icon: Mail },
+  { href: "/email", label: "Email", icon: MailPlus },
   { href: "/jobs", label: "Jobs", icon: ScanSearch },
   { href: "/prep", label: "Prep", icon: BookOpen },
   { href: "/mock", label: "Mock", icon: MessageSquare },
