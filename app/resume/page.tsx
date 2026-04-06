@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState, useEffect } from "react";
+import { consumeSSE } from "../../lib/consumeSSE";
+import { extractJson } from "../../lib/extractJson";
 import {
   Upload, FileText, CheckCircle2, AlertCircle, Loader2,
   ChevronDown, ChevronUp, Copy, CheckCheck, X
@@ -125,34 +127,11 @@ export default function ResumePage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Request failed (${res.status})`);
       }
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        for (const line of text.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
-          const parsed = JSON.parse(data);
-          if (parsed.error) { setError(parsed.error); break; }
-          if (parsed.chunk) {
-            accumulated += parsed.chunk;
-            setStreamChunks(prev => [...prev, parsed.chunk]);
-            setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
-          }
-        }
-      }
-
-      const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try { setResult(JSON.parse(jsonMatch[0])); } catch { /* show raw */ }
-      }
+      const accumulated = await consumeSSE(res, (chunk) => {
+        setStreamChunks(prev => [...prev, chunk]);
+        setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
+      });
+      try { setResult(extractJson(accumulated)); } catch { /* show raw */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Resume analysis failed");
     } finally {

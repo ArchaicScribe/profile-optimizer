@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { consumeSSE } from "../../lib/consumeSSE";
+import { extractJson } from "../../lib/extractJson";
 import { Loader2, Copy, CheckCheck, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -196,48 +198,11 @@ export default function RewritePage() {
         body: JSON.stringify({ headline: headline.trim(), summary: summary.trim() }),
       });
 
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        for (const line of text.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            setError(parsed.error);
-            break;
-          }
-          if (parsed.chunk) {
-            accumulated += parsed.chunk;
-            setStreamChunks((prev) => [...prev, parsed.chunk]);
-            setTimeout(
-              () =>
-                streamRef.current?.scrollTo({
-                  top: streamRef.current.scrollHeight,
-                  behavior: "smooth",
-                }),
-              10
-            );
-          }
-        }
-      }
-
-      const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          setResult(JSON.parse(jsonMatch[0]));
-        } catch {
-          // leave raw stream visible
-        }
-      }
+      const accumulated = await consumeSSE(res, (chunk) => {
+        setStreamChunks((prev) => [...prev, chunk]);
+        setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
+      });
+      try { setResult(extractJson(accumulated)); } catch { /* leave raw stream visible */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Rewrite failed");
     } finally {
