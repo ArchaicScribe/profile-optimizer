@@ -1,6 +1,6 @@
 import { ClaudeClient } from "../ClaudeClient";
+import { getGoalsContext } from "../../db/getUserConfig";
 import type { IAuditAgent, ParsedLinkedInData } from "../../../domain/ports/IAuditAgent";
-import { getUserConfig, buildGoalsContext } from "../../db/getUserConfig";
 
 function buildSystemPrompt(goalsContext: string): string {
   return `You are a senior career strategist specializing in helping software engineers transition into customer-facing technical roles at top-tier technology companies. These roles include: Solutions Engineer (SE), Solutions Architect (SA), Customer Engineer (CE), Customer Architect (CA), Partner Architect, and Technical Account Manager (TAM) - particularly at Seattle-area companies (Amazon, Microsoft, Google, Tableau/Salesforce, Snowflake, Databricks, Expedia, T-Mobile, Zillow, F5) and similar high-caliber tech firms.
@@ -35,23 +35,51 @@ Format your response as valid JSON matching this schema:
 }`;
 }
 
+function buildExportMessage(
+  data: ParsedLinkedInData,
+  siteContent?: string,
+  targetCompanies: string[] = [],
+): string {
+  const parts = [
+    "Please audit the following LinkedIn profile for SE/SA positioning at top-tier tech companies.",
+    `Target companies: ${targetCompanies.join(", ")}`,
+    "",
+    "## Profile Data",
+    `Headline: ${data.headline ?? "(none)"}`,
+    `Location: ${data.location ?? "(none)"}`,
+    `Open to Work: ${data.openToWork ? "YES - this is a red flag for contract mills" : "No"}`,
+    `Summary: ${data.summary ?? "(none)"}`,
+    "",
+    "## Positions",
+    ...data.positions.map(
+      (p) => `- ${p.title} at ${p.company} (${p.startDate ?? "?"} to ${p.endDate ?? "present"})\n  ${p.description ?? ""}`,
+    ),
+    "",
+    "## Skills",
+    data.skills.join(", "),
+  ];
+
+  if (siteContent) {
+    parts.push("", "## Personal Website Content", siteContent);
+  }
+
+  return parts.join("\n");
+}
+
 export class ProfileAuditorAgent implements IAuditAgent {
   private claude = ClaudeClient.getInstance();
 
   async auditFromExport(
     data: ParsedLinkedInData,
-    siteContent?: string
+    siteContent?: string,
   ): Promise<AsyncIterable<string>> {
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { config, goalsContext } = await getGoalsContext();
     const systemPrompt = buildSystemPrompt(goalsContext);
-    const userMessage = this.buildExportMessage(data, siteContent, config.targetCompanies);
-    return this.claude.streamText(systemPrompt, userMessage);
+    return this.claude.streamText(systemPrompt, buildExportMessage(data, siteContent, config.targetCompanies));
   }
 
   async auditFromUrl(url: string): Promise<AsyncIterable<string>> {
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { config, goalsContext } = await getGoalsContext();
     const systemPrompt = buildSystemPrompt(goalsContext);
 
     const userMessage = `Please audit the personal/portfolio website at this URL for SE/SA positioning at top-tier tech companies: ${url}
@@ -67,37 +95,5 @@ Focus on:
 Return your analysis as JSON matching the schema in your instructions.`;
 
     return this.claude.streamText(systemPrompt, userMessage);
-  }
-
-  private buildExportMessage(
-    data: ParsedLinkedInData,
-    siteContent?: string,
-    targetCompanies: string[] = []
-  ): string {
-    const parts = [
-      "Please audit the following LinkedIn profile for SE/SA positioning at top-tier tech companies.",
-      `Target companies: ${targetCompanies.join(", ")}`,
-      "",
-      "## Profile Data",
-      `Headline: ${data.headline ?? "(none)"}`,
-      `Location: ${data.location ?? "(none)"}`,
-      `Open to Work: ${data.openToWork ? "YES - this is a red flag for contract mills" : "No"}`,
-      `Summary: ${data.summary ?? "(none)"}`,
-      "",
-      "## Positions",
-      ...data.positions.map(
-        (p) =>
-          `- ${p.title} at ${p.company} (${p.startDate ?? "?"} to ${p.endDate ?? "present"})\n  ${p.description ?? ""}`
-      ),
-      "",
-      "## Skills",
-      data.skills.join(", "),
-    ];
-
-    if (siteContent) {
-      parts.push("", "## Personal Website Content", siteContent);
-    }
-
-    return parts.join("\n");
   }
 }
