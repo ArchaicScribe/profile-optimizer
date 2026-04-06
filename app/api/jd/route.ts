@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
+import { extractJson } from "../../../lib/extractJson";
 import type { ScanPreferences } from "../../../domain/entities/JobMatch";
 
 export const runtime = "nodejs";
@@ -24,8 +25,6 @@ export async function POST(req: NextRequest) {
     if (!jd || jd.trim().length < 20) {
       return Response.json({ error: "Please provide a job description." }, { status: 400 });
     }
-
-    const claude = ClaudeClient.getInstance();
 
     const userMessage = `Analyze this job description against the candidate's preferences.
 
@@ -54,18 +53,14 @@ Return a JSON object with this exact shape:
   "recommendation": "accept" | "inquire" | "decline"
 }`;
 
+    const claude = ClaudeClient.getInstance();
+
     let accumulated = "";
     for await (const chunk of claude.streamText(SYSTEM_PROMPT, userMessage)) {
       accumulated += chunk;
     }
 
-    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return Response.json({ error: "Analysis failed to produce a result." }, { status: 500 });
-    }
-
-    const analysis = JSON.parse(jsonMatch[0]);
-    return Response.json({ analysis });
+    return Response.json({ analysis: extractJson(accumulated) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Analysis failed";
     return Response.json({ error: message }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../../../infrastructure/ai/ClaudeClient";
+import { SSE_HEADERS } from "../../../../../lib/sseStream";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,11 +13,11 @@ interface ChatMessage {
 
 // POST /api/study/[id]/chat
 // Body: { message: string, questionContext?: string }
-// Returns: text/event-stream - streaming tutor response
-// Side effect: appends exchange to guide.chatHistory
+// Returns: text/event-stream — streaming tutor response
+// Side effect: appends exchange to guide.chatHistory (persisted after stream completes)
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -47,67 +48,47 @@ Your role:
 
 ${questionContext ? `The candidate is currently working on this question:\n${questionContext}` : ""}`;
 
-    const claude = ClaudeClient.getInstance();
-    const encoder = new TextEncoder();
-
     const conversationMessages = [
       ...history.map((m) => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: message },
     ];
 
+    const claude = ClaudeClient.getInstance();
+    const encoder = new TextEncoder();
+
     const stream = new ReadableStream({
       async start(controller) {
+        const send = (data: string) => controller.enqueue(encoder.encode(data));
+        let fullReply = "";
+
         try {
-          let fullReply = "";
-
-          const aiStream = await claude.client.messages.stream({
-            model: claude.defaultModel,
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: conversationMessages,
-          });
-
-          for await (const chunk of aiStream) {
-            if (
-              chunk.type === "content_block_delta" &&
-              chunk.delta.type === "text_delta"
-            ) {
-              const text = chunk.delta.text;
-              fullReply += text;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
-            }
+          for await (const text of claude.streamContent(systemPrompt, conversationMessages, 1024)) {
+            fullReply += text;
+            send(`data: ${JSON.stringify({ chunk: text })}\n\n`);
           }
 
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          send("data: [DONE]\n\n");
           controller.close();
 
-          // Persist the exchange asynchronously
+          // Persist the exchange — keep last 40 messages to prevent unbounded growth
           const updatedHistory: ChatMessage[] = [
             ...history,
             { role: "user", content: message },
             { role: "assistant", content: fullReply },
           ];
-          // Keep last 40 messages to avoid unbounded growth
-          const trimmed = updatedHistory.slice(-40);
           await prisma.studyGuide.update({
             where: { id },
-            data: { chatHistory: JSON.stringify(trimmed) },
+            data: { chatHistory: JSON.stringify(updatedHistory.slice(-40)) },
           });
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Tutor error";
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+          send(`data: ${JSON.stringify({ error: msg })}\n\n`);
           controller.close();
         }
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return new Response(stream, { headers: SSE_HEADERS });
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }

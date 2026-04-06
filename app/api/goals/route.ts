@@ -29,6 +29,7 @@ export async function GET() {
           id: "singleton",
           ...DEFAULT_CONFIG,
           targetCompanies: JSON.stringify(DEFAULT_CONFIG.targetCompanies),
+          certPath: JSON.stringify(DEFAULT_CONFIG.certPath),
         },
       });
     }

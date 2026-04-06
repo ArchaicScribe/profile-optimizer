@@ -1,16 +1,18 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { pdfContentBlock } from "../../../lib/pdfToBase64";
+import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
 // POST /api/resume
 // Accepts multipart form data with:
-//   - file: Resume PDF (required)
-//   - jd: Job Description PDF (optional)
+//   - file:   Resume PDF (required)
+//   - jd:     Job Description PDF (optional)
 //   - jdText: Job Description text (optional, alternative to jd PDF)
-// Returns: text/event-stream - streaming SE/SA-focused resume analysis
+// Returns: text/event-stream — streaming SE/SA-focused resume analysis
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -66,24 +68,12 @@ Return valid JSON only:
   }` : ""}
 }`;
 
-    const resumeBuffer = Buffer.from(await file.arrayBuffer());
-    const resumeBase64 = resumeBuffer.toString("base64");
-
-    const contentBlocks: object[] = [
-      { type: "document", source: { type: "base64", media_type: "application/pdf", data: resumeBase64 } },
-    ];
+    const contentBlocks: object[] = [await pdfContentBlock(file)];
 
     if (hasJDFile) {
-      const jdBuffer = Buffer.from(await jdFile.arrayBuffer());
-      const jdBase64 = jdBuffer.toString("base64");
-      contentBlocks.push(
-        { type: "document", source: { type: "base64", media_type: "application/pdf", data: jdBase64 } }
-      );
+      contentBlocks.push(await pdfContentBlock(jdFile));
     } else if (hasJDText) {
-      contentBlocks.push({
-        type: "text",
-        text: `JOB DESCRIPTION:\n\n${jdText!.trim()}`,
-      });
+      contentBlocks.push({ type: "text", text: `JOB DESCRIPTION:\n\n${jdText!.trim()}` });
     }
 
     contentBlocks.push({
@@ -94,48 +84,9 @@ Return valid JSON only:
     });
 
     const claude = ClaudeClient.getInstance();
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const aiStream = await claude.client.messages.stream({
-            model: claude.defaultModel,
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: [{ role: "user", content: contentBlocks as never }],
-          });
-
-          for await (const chunk of aiStream) {
-            if (
-              chunk.type === "content_block_delta" &&
-              chunk.delta.type === "text_delta"
-            ) {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
-              );
-            }
-          }
-
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Resume analysis failed";
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`)
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return sseStream(
+      claude.streamContent(systemPrompt, [{ role: "user", content: contentBlocks as never }]),
+    );
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
