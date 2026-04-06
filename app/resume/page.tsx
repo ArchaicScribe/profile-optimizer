@@ -3,53 +3,22 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { consumeSSE } from "../../lib/consumeSSE";
 import { extractJson } from "../../lib/extractJson";
+import type { JDComparison, ResumeResult } from "../../lib/types";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   Upload, FileText, CheckCircle2, AlertCircle, Loader2,
-  ChevronDown, ChevronUp, Copy, CheckCheck, X
+  ChevronDown, ChevronUp, X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
-interface JDComparison {
-  fitScore: number;
-  verdict: string;
-  matched: string[];
-  gaps: string[];
-  tailoringTips: string[];
-}
-
-interface ResumeResult {
-  score: number;
-  headline: string;
-  strengths: Array<{ point: string; detail: string }>;
-  weaknesses: Array<{ point: string; detail: string; severity: "high" | "medium" | "low" }>;
-  rewrites: Array<{ original: string; rewritten: string; reason: string }>;
-  missing: Array<{ item: string; detail: string }>;
-  redFlags: Array<{ flag: string; detail: string }>;
-  nextSteps: string[];
-  jdComparison?: JDComparison;
-}
-
 const PRIORITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
   high: "destructive",
   medium: "secondary",
   low: "outline",
 };
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
-      title="Copy"
-    >
-      {copied ? <CheckCheck size={13} className="text-green-500" /> : <Copy size={13} />}
-    </button>
-  );
-}
 
 function RewriteCard({ r }: { r: ResumeResult["rewrites"][0] }) {
   const [open, setOpen] = useState(false);
@@ -69,7 +38,7 @@ function RewriteCard({ r }: { r: ResumeResult["rewrites"][0] }) {
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-green-500">After</p>
-              <CopyButton text={r.rewritten} />
+              <CopyButton text={r.rewritten} compact />
             </div>
             <p className="text-sm leading-relaxed">{r.rewritten}</p>
           </div>
