@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reads .env and saves secrets to 1Password.
 # Run this when you rotate a key and want to update the stored value.
-# Requires: 1Password CLI (op) — https://developer.1password.com/docs/cli/get-started/
+# Requires: 1Password CLI (op) - https://developer.1password.com/docs/cli/get-started/
 # Run once to authenticate: op signin
 #
 # SECURE NOTE: The 1Password item is a Secure Note. The ANTHROPIC_API_KEY is expected

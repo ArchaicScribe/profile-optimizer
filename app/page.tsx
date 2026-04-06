@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileSearch, ScanSearch, TrendingUp, AlertTriangle, MapPin } from "lucide-react";
+import { FileSearch, ScanSearch, TrendingUp, AlertTriangle, MapPin, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -77,10 +77,10 @@ export default function Dashboard() {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-[oklch(0.6_0.2_280)] animate-pulse" />
           AI-powered recruiter signal analysis
         </div>
-        <h1 className="text-4xl font-bold tracking-tight gradient-text">
+        <h1 className="text-3xl font-bold tracking-tight gradient-text">
           Profile Optimizer
         </h1>
-        <p className="text-muted-foreground max-w-lg">
+        <p className="mt-1.5 text-sm text-muted-foreground max-w-lg">
           Audit your LinkedIn profile, identify signals attracting the wrong recruiters,
           and surface direct-hire roles at well-established companies.
         </p>
@@ -122,7 +122,7 @@ export default function Dashboard() {
       {/* Signal summary */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Signal Overview
           </h2>
           {summary && summary.totalAudits > 0 && (
@@ -159,6 +159,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
+          <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Score card */}
             <Card className="border-border/60 bg-card/60 flex flex-col items-center justify-center py-6 gap-4">
@@ -236,6 +237,46 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Phrases to Avoid */}
+          {summary.phrasesToAvoid.length > 0 && (
+            <Card className="border-border/60 bg-card/60">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={14} className="text-destructive" />
+                    <CardTitle className="text-sm">Phrases to Avoid</CardTitle>
+                  </div>
+                  <Link href="/audit" className="text-xs text-[oklch(0.65_0.15_280)] hover:underline underline-offset-2">
+                    Full report
+                  </Link>
+                </div>
+                <CardDescription className="text-xs">Words and phrases that attract the wrong recruiters</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {summary.phrasesToAvoid.map((p, i) => {
+                    const pill =
+                      p.context === "staffing_agency"
+                        ? "border-destructive/40 text-destructive bg-destructive/5"
+                        : p.context === "geographic"
+                        ? "border-yellow-500/40 text-yellow-500 bg-yellow-500/5"
+                        : "border-border text-muted-foreground bg-muted/30";
+                    return (
+                      <span
+                        key={i}
+                        title={p.reason}
+                        className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono cursor-default ${pill}`}
+                      >
+                        {p.phrase}
+                      </span>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           </div>
         )}
       </div>

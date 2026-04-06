@@ -8,7 +8,7 @@ import type { JobMatch, ScanPreferences } from "../domain/entities/JobMatch";
 
 // LinkedIn scraper is only registered when explicitly opted in.
 // This means even if "linkedin" is somehow passed in a boards array,
-// it resolves to undefined and is skipped — no request is made.
+// it resolves to undefined and is skipped - no request is made.
 const SCRAPERS: Partial<Record<string, new () => { scan: (prefs: ScanPreferences) => Promise<JobMatch[]> }>> = {
   indeed: IndeedScraper,
   levels: LevelsFyiScraper,

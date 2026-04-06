@@ -1,7 +1,8 @@
 import { LinkedInExportParser } from "../infrastructure/scrapers/LinkedInExportParser";
 import { ProfileAuditorAgent } from "../infrastructure/ai/agents/ProfileAuditorAgent";
 import { prisma } from "../infrastructure/db/PrismaClient";
-import type { ProfileAudit, RecruiterSignal, Recommendation } from "../domain/entities/ProfileAudit";
+import { extractJson } from "../lib/extractJson";
+import type { RecruiterSignal, Recommendation } from "../domain/entities/ProfileAudit";
 
 // Coordinates the full audit flow:
 // 1. Parse the LinkedIn export ZIP (or accept a URL)
@@ -13,7 +14,7 @@ export class AuditProfileUseCase {
 
   async *auditFromExport(
     zipBuffer: Buffer,
-    siteUrl?: string
+    siteUrl?: string,
   ): AsyncGenerator<string> {
     const parsed = await this.parser.parseLinkedInExport(zipBuffer);
 
@@ -52,15 +53,13 @@ export class AuditProfileUseCase {
     await this.persistAudit("url", fullResponse);
   }
 
-  private async persistAudit(
-    source: "export" | "url",
-    rawResponse: string
-  ): Promise<void> {
+  private async persistAudit(source: "export" | "url", rawResponse: string): Promise<void> {
     try {
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return;
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = extractJson<{
+        auditScore?: number;
+        signals?: RecruiterSignal[];
+        recommendations?: Recommendation[];
+      }>(rawResponse);
 
       await prisma.profileAudit.create({
         data: {
@@ -68,14 +67,14 @@ export class AuditProfileUseCase {
           rawData: rawResponse,
           auditScore: parsed.auditScore ?? 0,
           signals: {
-            create: (parsed.signals ?? []).map((s: RecruiterSignal) => ({
+            create: (parsed.signals ?? []).map((s) => ({
               text: s.text,
               type: s.type,
               severity: s.severity,
             })),
           },
           recs: {
-            create: (parsed.recommendations ?? []).map((r: Recommendation) => ({
+            create: (parsed.recommendations ?? []).map((r) => ({
               title: r.title,
               body: r.body,
               priority: r.priority,

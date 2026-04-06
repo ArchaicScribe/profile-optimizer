@@ -1,7 +1,7 @@
 import type { IJobScanner } from "../../domain/ports/IJobScanner";
 import type { JobMatch, ScanPreferences } from "../../domain/entities/JobMatch";
 
-// Indeed exposes RSS feeds for job searches — no Playwright required,
+// Indeed exposes RSS feeds for job searches - no Playwright required,
 // and RSS is not prohibited by their ToS for personal use.
 // Feed URL pattern: https://www.indeed.com/rss?q=<query>&l=<location>
 export class IndeedScraper implements IJobScanner {

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -35,6 +36,57 @@ model Recommendation {
   audit    ProfileAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
+model UserConfig {
+  id              String   @id @default("singleton")
+  updatedAt       DateTime @updatedAt
+  targetRole      String   @default("Solutions Engineer")
+  targetCompanies String   @default("[]") // JSON array e.g. ["Snowflake","Databricks","Google"]
+  currentRole     String   @default("Senior Software Engineer")
+  yearsExperience Int      @default(6)
+  keyBackground   String   @default("") // narrative context injected into all AI prompts
+  avoidContext    String   @default("") // things to de-emphasize (e.g. federal experience)
+  activeCert      String   @default("AI-102") // cert currently being studied
+  certPath        String   @default("[]") // JSON array: ordered cert plan e.g. ["AI-102","AZ-305"]
+  certNotes       String   @default("") // freeform notes (not injected into AI - private)
+}
+
+model StudyGuide {
+  id          String          @id @default(cuid())
+  createdAt   DateTime        @default(now())
+  jobTitle    String
+  company     String
+  jdSummary   String?
+  chatHistory String          @default("[]") // JSON array of {role, content} messages
+  questions   StudyQuestion[]
+}
+
+model StudyQuestion {
+  id             String            @id @default(cuid())
+  guideId        String
+  guide          StudyGuide        @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  category       String            // "dsa" | "system_design" | "sql" | "ai_ml" | "company_specific"
+  difficulty     String            // "easy" | "medium" | "hard"
+  topic          String
+  prompt         String
+  hints          String            @default("[]") // JSON array of hint strings
+  status         String            @default("unanswered") // "unanswered" | "got_it" | "struggled"
+  reviewCount    Int               @default(0)
+  lastReviewedAt DateTime?
+  attempts       QuestionAttempt[]
+}
+
+model QuestionAttempt {
+  id         String        @id @default(cuid())
+  createdAt  DateTime      @default(now())
+  questionId String
+  question   StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  guideId    String
+  answerText String
+  aiFeedback String?       // AI evaluation: what was right, what was missing, what to improve
+  score      Int?          // 0-100 AI-assigned score
+  status     String        // "got_it" | "struggled"
+}
+
 model ScanRun {
   id        String     @id @default(cuid())
   startedAt DateTime   @default(now())
@@ -55,4 +107,12 @@ model JobMatch {
   isContract Boolean  @default(false)
   scanRunId  String
   scanRun    ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+}
+
+model CompanyCard {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   String   @unique
+  rawData   String   // JSON blob
 }

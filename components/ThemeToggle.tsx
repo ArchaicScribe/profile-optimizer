@@ -7,7 +7,7 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Avoid hydration mismatch — don't render until client-side
+  // Avoid hydration mismatch - don't render until client-side
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="w-8 h-8" />;
 

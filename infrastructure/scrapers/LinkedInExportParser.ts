@@ -80,7 +80,7 @@ export class LinkedInExportParser implements IProfileParser {
     };
   }
 
-  // Basic CSV line parser — handles quoted fields with commas inside
+  // Basic CSV line parser - handles quoted fields with commas inside
   private parseCsvLine(line: string): string[] {
     const result: string[] = [];
     let current = "";
