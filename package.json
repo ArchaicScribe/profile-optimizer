@@ -22,6 +22,7 @@
     "@prisma/adapter-better-sqlite3": "^7.6.0",
     "@prisma/adapter-libsql": "^7.6.0",
     "@prisma/client": "^7.6.0",
+    "@sentry/nextjs": "^10.47.0",
     "adm-zip": "^0.5.17",
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",

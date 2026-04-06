@@ -31,18 +31,20 @@ Style rules:
 
 // POST /api/email
 // Body: FormData with:
-//   type:     EmailType (required)
-//   company:  string (required)
-//   role:     string (required)
-//   jd:       string (optional — pasted JD text)
-//   jdFile:   File (optional — JD PDF)
-//   resumeFile: File (optional — resume PDF)
-//   feedback: string (optional — revision feedback)
-//   previous: string (optional — previous draft to revise)
+//   recruiterMessage: string (optional — message from recruiter to reply to)
+//   type:             EmailType (optional — inferred if not provided)
+//   company:          string (optional)
+//   role:             string (optional)
+//   jd:               string (optional — pasted JD text)
+//   jdFile:           File (optional — JD PDF)
+//   resumeFile:       File (optional — resume PDF)
+//   feedback:         string (optional — revision feedback)
+//   previous:         string (optional — previous draft to revise)
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
-    const type = (form.get("type") as EmailType | null) ?? "application";
+    const recruiterMessage = (form.get("recruiterMessage") as string | null)?.trim() ?? "";
+    const type = form.get("type") as EmailType | null;
     const company = (form.get("company") as string | null)?.trim() ?? "";
     const role = (form.get("role") as string | null)?.trim() ?? "";
     const jdText = (form.get("jd") as string | null)?.trim() ?? "";
@@ -51,12 +53,16 @@ export async function POST(req: NextRequest) {
     const feedback = (form.get("feedback") as string | null)?.trim() ?? "";
     const previous = (form.get("previous") as string | null)?.trim() ?? "";
 
-    if (!company || !role) {
-      return Response.json({ error: "Company and role are required." }, { status: 400 });
+    // Need at least one piece of context to work with
+    const hasContext = recruiterMessage || company || role || jdText || jdFile;
+    if (!hasContext) {
+      return Response.json(
+        { error: "Provide at least one detail: a recruiter message, company, role, or job description." },
+        { status: 400 },
+      );
     }
 
     const { goalsContext } = await getGoalsContext();
-
     const systemWithGoals = `${SYSTEM_PROMPT}\n\n${goalsContext}`;
 
     const contentBlocks: object[] = [];
@@ -68,14 +74,30 @@ export async function POST(req: NextRequest) {
       contentBlocks.push(await pdfContentBlock(resumeFile));
     }
 
-    const parts = [
-      `Generate a ${type.replace("_", " ")} email for the following situation.`,
-      ``,
-      `Instructions: ${TYPE_INSTRUCTIONS[type]}`,
-      ``,
-      `Company: ${company}`,
-      `Role: ${role}`,
-    ];
+    const parts: string[] = [];
+
+    // Determine instructions — use explicit type if given, otherwise ask Claude to infer
+    if (type) {
+      parts.push(
+        `Generate a ${type.replace(/_/g, " ")} email for the following situation.`,
+        ``,
+        `Instructions: ${TYPE_INSTRUCTIONS[type]}`,
+      );
+    } else {
+      parts.push(
+        `Generate the most appropriate professional email for the following situation.`,
+        `Infer the email type (cold outreach, application, follow-up, or networking) from the context provided.`,
+        `Keep it concise, direct, and human. Under 200 words.`,
+      );
+    }
+
+    parts.push(``);
+
+    if (recruiterMessage) {
+      parts.push(`Recruiter's message to reply to:`, `"""`, recruiterMessage, `"""`, ``);
+    }
+    if (company) parts.push(`Company: ${company}`);
+    if (role)    parts.push(`Role: ${role}`);
 
     if (jdText) {
       parts.push(``, `Job Description:`, jdText);
