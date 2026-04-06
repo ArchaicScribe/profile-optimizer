@@ -2,28 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { consumeSSE } from "../../lib/consumeSSE";
+import type { RoleType, InterviewConfig, MessageRole, AppState, MockMessage } from "../../lib/types";
+import { ScoreBadge } from "@/components/ui/score-badge";
 import { Loader2, Mic, Send, RotateCcw, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-type RoleType = "behavioral" | "system_design" | "cloud_architecture" | "mixed";
-
-interface InterviewConfig {
-  company: string;
-  roleType: RoleType;
-  questionCount: 5 | 8;
-}
-
-type MessageRole = "interviewer" | "candidate" | "feedback";
-
-interface Message {
-  role: MessageRole;
-  content: string;
-  score?: number;
-}
-
-type AppState = "setup" | "interview" | "complete";
 
 const ROLE_TYPE_LABELS: Record<RoleType, string> = {
   behavioral: "Behavioral",
@@ -39,22 +23,6 @@ function extractScore(text: string): number | undefined {
     if (n >= 0 && n <= 100) return n;
   }
   return undefined;
-}
-
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "text-green-400 border-green-500/40 bg-green-500/10"
-      : score >= 60
-      ? "text-yellow-400 border-yellow-500/40 bg-yellow-500/10"
-      : "text-red-400 border-red-500/40 bg-red-500/10";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${color}`}
-    >
-      {score}/100
-    </span>
-  );
 }
 
 function TypingIndicator() {
@@ -74,7 +42,7 @@ export default function MockPage() {
     roleType: "mixed",
     questionCount: 5,
   });
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MockMessage[]>([]);
   const [questionsAsked, setQuestionsAsked] = useState(0);
   const [candidateInput, setCandidateInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -110,7 +78,7 @@ export default function MockPage() {
     const text = candidateInput.trim();
     if (!text || streaming) return;
 
-    const candidateMsg: Message = { role: "candidate", content: text };
+    const candidateMsg: MockMessage = { role: "candidate", content: text };
     const updatedMessages = [...messages, candidateMsg];
     setMessages(updatedMessages);
     setCandidateInput("");
@@ -119,7 +87,7 @@ export default function MockPage() {
     await callApi(updatedMessages, false);
   }
 
-  async function callApi(currentMessages: Message[], isFirst: boolean) {
+  async function callApi(currentMessages: MockMessage[], isFirst: boolean) {
     setStreaming(true);
     setStreamingText("");
 
@@ -152,12 +120,12 @@ export default function MockPage() {
 
       if (isFirst) {
         // First turn: just the question, no feedback
-        const msg: Message = { role: "interviewer", content: displayText };
+        const msg: MockMessage = { role: "interviewer", content: displayText };
         setMessages([msg]);
       } else {
         // Subsequent turns: extract feedback score and add as interviewer message
         const score = extractScore(displayText);
-        const msg: Message = { role: "interviewer", content: displayText, score };
+        const msg: MockMessage = { role: "interviewer", content: displayText, score };
         setMessages((prev) => [...prev, msg]);
       }
 
@@ -170,7 +138,7 @@ export default function MockPage() {
     }
   }
 
-  function finishInterview(finalMessages: Message[]) {
+  function finishInterview(finalMessages: MockMessage[]) {
     setAppState("complete");
 
     // Compute average score from all interviewer messages that have a score
@@ -333,7 +301,7 @@ export default function MockPage() {
             <CardContent className="pt-5 pb-5">
               <div className="flex items-center gap-3">
                 <div className="text-sm font-medium">Average Score</div>
-                <ScoreBadge score={computedAvg} />
+                <ScoreBadge score={computedAvg} outOf />
                 {allScores.length > 0 && (
                   <span className="text-xs text-muted-foreground">
                     across {allScores.length} evaluated answer{allScores.length !== 1 ? "s" : ""}
@@ -366,7 +334,7 @@ export default function MockPage() {
                   {msg.content}
                   {msg.score !== undefined && (
                     <div className="mt-2 flex items-center gap-2">
-                      <ScoreBadge score={msg.score} />
+                      <ScoreBadge score={msg.score} outOf />
                     </div>
                   )}
                 </div>
@@ -435,7 +403,7 @@ export default function MockPage() {
                       <span className="text-xs font-semibold text-yellow-500/80 uppercase tracking-wide">
                         Feedback
                       </span>
-                      <ScoreBadge score={msg.score} />
+                      <ScoreBadge score={msg.score} outOf />
                     </div>
                     <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
                       {msg.content}

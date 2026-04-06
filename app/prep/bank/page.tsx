@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { ScoreBadge } from "@/components/ui/score-badge";
 import { CheckCircle2, XCircle, AlertTriangle, Search, SlidersHorizontal, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,17 +45,6 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   hard: "text-destructive border-destructive/30 bg-destructive/5",
 };
 
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 75 ? "text-green-500 bg-green-500/10 border-green-500/20"
-    : score >= 50 ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20"
-    : "text-destructive bg-destructive/10 border-destructive/20";
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums ${color}`}>
-      {score}
-    </span>
-  );
-}
 
 function BankQuestionRow({ q }: { q: BankQuestion }) {
   const [expanded, setExpanded] = useState(false);

@@ -3,56 +3,12 @@
 import { useRef, useState } from "react";
 import { consumeSSE } from "../../lib/consumeSSE";
 import { extractJson } from "../../lib/extractJson";
-import { Loader2, Copy, CheckCheck, ChevronDown, ChevronUp } from "lucide-react";
+import type { HeadlineVariant, SummaryVariant, RewriteResult } from "../../lib/types";
+import { CopyButton } from "@/components/ui/copy-button";
+import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-interface HeadlineVariant {
-  text: string;
-  rationale: string;
-  signals: string[];
-}
-
-interface SummaryVariant {
-  text: string;
-  rationale: string;
-  keyChanges: string[];
-}
-
-interface RewriteResult {
-  headlines: HeadlineVariant[];
-  summaries: SummaryVariant[];
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors shrink-0"
-    >
-      {copied ? (
-        <>
-          <CheckCheck size={12} className="text-green-500" />
-          Copied
-        </>
-      ) : (
-        <>
-          <Copy size={12} />
-          Copy
-        </>
-      )}
-    </button>
-  );
-}
 
 function HeadlineCard({ variant, index }: { variant: HeadlineVariant; index: number }) {
   const [open, setOpen] = useState(true);

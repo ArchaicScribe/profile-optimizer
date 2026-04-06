@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { consumeSSE } from "../../lib/consumeSSE";
 import { extractJson } from "../../lib/extractJson";
+import type { AuditResult, JDComparison, ResumeResult } from "../../lib/types";
 import { Upload, Link2, Loader2, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,33 +11,6 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 
-interface AuditResult {
-  auditScore: number;
-  signals: Array<{ text: string; type: string; severity: string }>;
-  recommendations: Array<{ title: string; body: string; priority: string; category: string }>;
-  summary: string;
-  phrasesToAvoid?: Array<{ phrase: string; reason: string; context: string }>;
-}
-
-interface JDComparison {
-  fitScore: number;
-  verdict: string;
-  matched: string[];
-  gaps: string[];
-  tailoringTips: string[];
-}
-
-interface ResumeResult {
-  score: number;
-  headline: string;
-  strengths: Array<{ point: string; detail: string }>;
-  weaknesses: Array<{ point: string; detail: string; severity: "high" | "medium" | "low" }>;
-  rewrites: Array<{ original: string; rewritten: string; reason: string }>;
-  missing: Array<{ item: string; detail: string }>;
-  redFlags: Array<{ flag: string; detail: string }>;
-  nextSteps: string[];
-  jdComparison?: JDComparison;
-}
 
 const PRIORITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
   high: "destructive",

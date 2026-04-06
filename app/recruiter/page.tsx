@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { JDAnalysis } from "../../lib/types";
+import type { ResponseType } from "../api/response/route";
 import {
   Upload, Loader2, CheckCircle2, AlertCircle, FileText,
   ChevronDown, ChevronUp, RefreshCw, CheckCircle, XCircle, HelpCircle,
@@ -8,28 +10,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-// ---- Types ----------------------------------------------------------------
-
-type ResponseType = "accept" | "decline" | "inquire";
-
-interface JDAnalysis {
-  overallFit: "strong" | "moderate" | "poor";
-  fitScore: number;
-  roleVerdict?: string;
-  summary: string;
-  matches: Array<{ label: string; detail: string }>;
-  concerns: Array<{ label: string; detail: string }>;
-  redFlags: Array<{ label: string; detail: string }>;
-  isContract: boolean;
-  isStaffingAgency: boolean;
-  hasGovernmentWork?: boolean;
-  locationMatch: boolean;
-  recommendation: "apply" | "inquire" | "decline";
-  recommendationReason?: string;
-  missingFromProfile?: string[];
-  suggestedQuestions?: string[];
-}
 
 // ---- Response config ------------------------------------------------------
 

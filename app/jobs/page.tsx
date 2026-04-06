@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import type { JobMatch, JobBoard, ScanPreferences } from "../../domain/entities/JobMatch";
 import type { ResponseType } from "../api/response/route";
+import type { JDAnalysis } from "../../lib/types";
+import { ScoreBadge } from "@/components/ui/score-badge";
 
 const BOARD_LABELS: Record<JobBoard, string> = {
   indeed: "Indeed",
@@ -33,34 +35,6 @@ const DEFAULT_PREFS: ScanPreferences = {
   boards: ["indeed", "levels", "dice"],
 };
 
-interface JDAnalysis {
-  overallFit: "strong" | "moderate" | "poor";
-  fitScore: number;
-  roleVerdict?: string;
-  summary: string;
-  matches: Array<{ label: string; detail: string }>;
-  concerns: Array<{ label: string; detail: string }>;
-  redFlags: Array<{ label: string; detail: string }>;
-  isContract: boolean;
-  isStaffingAgency: boolean;
-  hasGovernmentWork?: boolean;
-  locationMatch: boolean;
-  recommendation: "apply" | "inquire" | "decline";
-  recommendationReason?: string;
-  missingFromProfile?: string[];
-  suggestedQuestions?: string[];
-}
-
-function ScorePill({ score }: { score: number }) {
-  const color = score >= 75 ? "text-green-500 bg-green-500/10 border-green-500/20"
-    : score >= 50 ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20"
-    : "text-muted-foreground bg-muted border-border";
-  return (
-    <span className={`inline-flex items-center justify-center w-10 h-6 rounded-full border text-xs font-bold tabular-nums ${color}`}>
-      {score}
-    </span>
-  );
-}
 
 const RESPONSE_CONFIG: Record<ResponseType, { label: string; icon: React.ReactNode; btn: string; msgBg: string; msgBorder: string; msgText: string }> = {
   accept: {
@@ -704,7 +678,7 @@ export default function JobsPage() {
                       <Table>
                         <TableBody>
                           <TableRow className="border-0 hover:bg-muted/30 transition-colors group">
-                            <TableCell className="w-16"><ScorePill score={job.matchScore} /></TableCell>
+                            <TableCell className="w-16"><ScoreBadge score={job.matchScore} /></TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1.5">
                                 <a href={job.url} target="_blank" rel="noopener noreferrer"

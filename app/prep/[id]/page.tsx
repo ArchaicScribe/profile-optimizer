@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { consumeSSE } from "../../../lib/consumeSSE";
 import { use } from "react";
+import type { AiFeedback, Attempt, StudyQuestion, StudyGuide, ChatMessage } from "../../../lib/types";
+import { ScoreBadge } from "@/components/ui/score-badge";
 import {
   CheckCircle2, XCircle, ChevronDown, ChevronUp, Lightbulb,
   Bot, X, Send, Loader2, AlertTriangle, RotateCcw, History,
@@ -14,46 +16,6 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface AiFeedback {
-  score: number;
-  summary: string;
-  strengths: string[];
-  gaps: string[];
-  improvement: string;
-}
-
-interface Attempt {
-  id: string;
-  createdAt: string;
-  answerText: string;
-  aiFeedback: AiFeedback | null;
-  score: number | null;
-  status: "got_it" | "struggled";
-}
-
-interface StudyQuestion {
-  id: string;
-  category: string;
-  difficulty: string;
-  topic: string;
-  prompt: string;
-  hints: string[];
-  status: "unanswered" | "got_it" | "struggled";
-  reviewCount: number;
-}
-
-interface StudyGuide {
-  id: string;
-  jobTitle: string;
-  company: string;
-  jdSummary?: string;
-  questions: StudyQuestion[];
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
 
 const CATEGORIES = [
   { key: "dsa", label: "DSA" },
@@ -69,17 +31,6 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   hard: "text-destructive border-destructive/30 bg-destructive/5",
 };
 
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 75 ? "text-green-500 bg-green-500/10 border-green-500/20"
-    : score >= 50 ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20"
-    : "text-destructive bg-destructive/10 border-destructive/20";
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums ${color}`}>
-      {score}
-    </span>
-  );
-}
 
 function AttemptHistory({ questionId, guideId }: { questionId: string; guideId: string }) {
   const [attempts, setAttempts] = useState<Attempt[] | null>(null);
