@@ -55,12 +55,8 @@ Return a JSON object with this exact shape:
 
     const claude = ClaudeClient.getInstance();
 
-    let accumulated = "";
-    for await (const chunk of claude.streamText(SYSTEM_PROMPT, userMessage)) {
-      accumulated += chunk;
-    }
-
-    return Response.json({ analysis: extractJson(accumulated) });
+    const text = await claude.complete(SYSTEM_PROMPT, userMessage);
+    return Response.json({ analysis: extractJson(text) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Analysis failed";
     return Response.json({ error: message }, { status: 500 });

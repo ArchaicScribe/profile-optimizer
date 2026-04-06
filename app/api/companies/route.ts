@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { extractJson } from "../../../lib/extractJson";
 
 export const runtime = "nodejs";
@@ -39,8 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmedCompany = company.trim();
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { goalsContext } = await getGoalsContext();
 
     const systemPrompt = `You are a senior SE/SA/CA career coach with insider knowledge of how top tech companies hire for customer-facing technical roles (Solutions Engineer, Solutions Architect, Customer Engineer, Customer Architect, Partner Architect).
 
@@ -71,12 +70,7 @@ Be specific to ${trimmedCompany}. Do not give generic SE/SA interview advice.`;
 
     const claude = ClaudeClient.getInstance();
 
-    let fullOutput = "";
-    for await (const chunk of claude.streamText(systemPrompt, userMessage)) {
-      fullOutput += chunk;
-    }
-
-    const parsed = extractJson(fullOutput);
+    const parsed = extractJson(await claude.complete(systemPrompt, userMessage));
 
     const saved = await prisma.companyCard.upsert({
       where: { company: trimmedCompany },

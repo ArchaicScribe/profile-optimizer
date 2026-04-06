@@ -43,25 +43,6 @@ export class ClaudeClient {
     return ClaudeClient.instance;
   }
 
-  async *streamText(
-    systemPrompt: string,
-    userMessage: string,
-    maxTokens = 4096,
-  ): AsyncGenerator<string> {
-    const stream = await this.client.messages.stream({
-      model: this.defaultModel,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-    });
-
-    for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-        yield chunk.delta.text;
-      }
-    }
-  }
-
   /** Stream a multi-turn or multimodal conversation (e.g. PDF document blocks). */
   async *streamContent(
     systemPrompt: string,
@@ -82,10 +63,36 @@ export class ClaudeClient {
     }
   }
 
+  /** Stream a single-turn text conversation. */
+  streamText(systemPrompt: string, userMessage: string, maxTokens = 4096): AsyncGenerator<string> {
+    return this.streamContent(systemPrompt, [{ role: "user", content: userMessage }], maxTokens);
+  }
+
+  /** Get the full text response in one call. Uses the non-streaming API — more efficient when
+   *  the caller doesn't need to forward chunks to a client. */
+  async complete(systemPrompt: string, userMessage: string, maxTokens = 4096): Promise<string> {
+    return this.completeContent(systemPrompt, [{ role: "user", content: userMessage }], maxTokens);
+  }
+
+  /** Same as complete() but for multimodal / multi-turn messages. */
+  async completeContent(
+    systemPrompt: string,
+    messages: Anthropic.MessageParam[],
+    maxTokens = 4096,
+  ): Promise<string> {
+    const response = await this.client.messages.create({
+      model: this.defaultModel,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages,
+    });
+    return this.extractText(response.content);
+  }
+
   async completeWithTools<T>(
     systemPrompt: string,
     userMessage: string,
-    tools: Anthropic.Tool[]
+    tools: Anthropic.Tool[],
   ): Promise<{ content: string; toolResults: T[] }> {
     const response = await this.client.messages.create({
       model: this.defaultModel,
@@ -95,15 +102,18 @@ export class ClaudeClient {
       tools,
     });
 
-    const textContent = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as Anthropic.TextBlock).text)
+    return {
+      content: this.extractText(response.content),
+      toolResults: response.content
+        .filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")
+        .map((b) => b.input as T),
+    };
+  }
+
+  private extractText(content: Anthropic.ContentBlock[]): string {
+    return content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
       .join("");
-
-    const toolResults = response.content
-      .filter((b) => b.type === "tool_use")
-      .map((b) => (b as Anthropic.ToolUseBlock).input as T);
-
-    return { content: textContent, toolResults };
   }
 }

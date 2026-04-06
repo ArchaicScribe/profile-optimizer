@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { sseStream } from "../../../lib/sseStream";
 
@@ -24,8 +24,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Please upload a PDF resume." }, { status: 400 });
     }
 
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { config, goalsContext } = await getGoalsContext();
     const hasJDFile = jdFile && jdFile.name.endsWith(".pdf");
     const hasJDText = jdText && jdText.trim().length > 0;
     const hasJD = hasJDFile || hasJDText;

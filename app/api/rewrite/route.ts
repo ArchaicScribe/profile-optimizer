@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { getUserConfig, buildGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
@@ -21,8 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const config = await getUserConfig();
-    const goalsContext = buildGoalsContext(config);
+    const { goalsContext } = await getGoalsContext();
 
     const systemPrompt = `You are a LinkedIn copywriter specializing in positioning software engineers for Solutions Engineer, Solutions Architect, Customer Engineer, and Customer Architect roles at top-tier tech companies.
 

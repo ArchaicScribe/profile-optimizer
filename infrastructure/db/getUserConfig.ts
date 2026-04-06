@@ -11,7 +11,7 @@ export interface UserConfig {
   certPath: string[];
 }
 
-const DEFAULTS: UserConfig = {
+export const DEFAULTS: UserConfig = {
   targetRole: "Solutions Engineer / Solutions Architect / Customer Engineer",
   targetCompanies: ["Amazon", "Microsoft", "Google", "Snowflake", "Databricks", "Salesforce"],
   currentRole: "Senior Software Engineer",
@@ -72,4 +72,10 @@ export function buildGoalsContext(config: UserConfig): string {
 ${certLine ? `- Certifications in progress: ${certLine}` : ""}
 ${certPathLine ? `- ${certPathLine}` : ""}
 `.trim();
+}
+
+/** Convenience: load config and build the goals context string in one call. */
+export async function getGoalsContext(): Promise<{ config: UserConfig; goalsContext: string }> {
+  const config = await getUserConfig();
+  return { config, goalsContext: buildGoalsContext(config) };
 }

@@ -1,22 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
+import { DEFAULTS } from "../../../infrastructure/db/getUserConfig";
 
 export const runtime = "nodejs";
 
-const DEFAULT_CONFIG = {
-  targetRole: "Solutions Engineer / Solutions Architect / Customer Engineer",
-  targetCompanies: ["Amazon", "Microsoft", "Google", "Snowflake", "Databricks", "Salesforce"],
-  currentRole: "Senior Software Engineer",
-  yearsExperience: 6,
-  keyBackground:
-    "Enterprise Java/Spring Boot modernization specialist with 6 years at large organizations. " +
-    "Strong in distributed systems, cloud-native architecture (AWS/Azure/Kubernetes), " +
-    "OAuth2/security, and production observability. Targeting SE/SA/CA roles at Seattle-area and top-tier tech companies.",
-  avoidContext: "Do not emphasize government, federal, or clearance experience. Avoid contractor/staffing agency framing.",
-  activeCert: "AI-102",
-  certPath: ["AI-102", "AZ-305"],
-  certNotes: "",
-};
+const DEFAULT_CONFIG = { ...DEFAULTS, certNotes: "" };
 
 // GET /api/goals - return current user config
 export async function GET() {

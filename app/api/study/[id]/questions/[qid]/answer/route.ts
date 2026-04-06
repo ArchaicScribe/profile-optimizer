@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "../../../../../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../../../../../infrastructure/ai/ClaudeClient";
+import { extractJson, tryParseJson } from "../../../../../../../lib/extractJson";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,7 +15,7 @@ Return only valid JSON.`;
 // Returns: { attempt: QuestionAttempt }
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; qid: string }> }
+  { params }: { params: Promise<{ id: string; qid: string }> },
 ) {
   try {
     const { id: guideId, qid } = await params;
@@ -31,8 +32,6 @@ export async function POST(
     if (!question) {
       return Response.json({ error: "Question not found." }, { status: 404 });
     }
-
-    const claude = ClaudeClient.getInstance();
 
     const userMessage = `Evaluate this interview answer.
 
@@ -53,36 +52,24 @@ Return a JSON object:
   "improvement": string (one concrete thing to focus on next time)
 }`;
 
-    let accumulated = "";
-    for await (const chunk of claude.streamText(SYSTEM_PROMPT, userMessage)) {
-      accumulated += chunk;
-    }
+    const claude = ClaudeClient.getInstance();
+    const text = await claude.complete(SYSTEM_PROMPT, userMessage);
 
-    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
     let aiFeedback: string | null = null;
     let score: number | null = null;
 
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        score = typeof parsed.score === "number" ? Math.min(100, Math.max(0, parsed.score)) : null;
-        aiFeedback = JSON.stringify(parsed);
-      } catch {
-        aiFeedback = accumulated.trim();
-      }
+    try {
+      const parsed = extractJson<{ score?: number }>(text);
+      score = typeof parsed.score === "number" ? Math.min(100, Math.max(0, parsed.score)) : null;
+      aiFeedback = JSON.stringify(parsed);
+    } catch {
+      aiFeedback = text.trim() || null;
     }
 
     // Save attempt and update question status in a transaction
     const [attempt] = await prisma.$transaction([
       prisma.questionAttempt.create({
-        data: {
-          questionId: qid,
-          guideId,
-          answerText,
-          aiFeedback,
-          score,
-          status,
-        },
+        data: { questionId: qid, guideId, answerText, aiFeedback, score, status },
       }),
       prisma.studyQuestion.update({
         where: { id: qid },
@@ -94,7 +81,7 @@ Return a JSON object:
       }),
     ]);
 
-    return Response.json({ attempt: { ...attempt, aiFeedback: aiFeedback ? JSON.parse(aiFeedback) : null } });
+    return Response.json({ attempt: { ...attempt, aiFeedback: tryParseJson(attempt.aiFeedback) } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to submit answer";
     return Response.json({ error: message }, { status: 500 });
@@ -105,7 +92,7 @@ Return a JSON object:
 // Returns all past attempts for a question, newest first
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string; qid: string }> }
+  { params }: { params: Promise<{ id: string; qid: string }> },
 ) {
   try {
     const { qid } = await params;
@@ -114,14 +101,9 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
-    const parsed = attempts.map((a) => ({
-      ...a,
-      aiFeedback: a.aiFeedback
-        ? (() => { try { return JSON.parse(a.aiFeedback!); } catch { return a.aiFeedback; } })()
-        : null,
-    }));
-
-    return Response.json({ attempts: parsed });
+    return Response.json({
+      attempts: attempts.map((a) => ({ ...a, aiFeedback: tryParseJson(a.aiFeedback) })),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load attempts";
     return Response.json({ error: message }, { status: 500 });
