@@ -121,11 +121,26 @@ export default function AuditPage() {
       if (jdMode === "text" && jdText.trim()) form.append("jdText", jdText.trim());
       try {
         const res = await fetch("/api/resume", { method: "POST", body: form });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(error ?? `HTTP ${res.status}`);
+        }
         const accumulated = await consumeSSE(res, (chunk) => {
           setStreamChunks((prev) => [...prev, chunk]);
           setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
         });
-        try { setResumeResult(extractJson(accumulated)); } catch { /* show raw */ }
+        try {
+          const parsed = extractJson<ResumeResult>(accumulated);
+          setResumeResult({
+            ...parsed,
+            strengths: parsed.strengths ?? [],
+            weaknesses: parsed.weaknesses ?? [],
+            rewrites: parsed.rewrites ?? [],
+            missing: parsed.missing ?? [],
+            redFlags: parsed.redFlags ?? [],
+            nextSteps: parsed.nextSteps ?? [],
+          });
+        } catch { /* show raw chunks */ }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Resume analysis failed");
       } finally {
@@ -148,11 +163,23 @@ export default function AuditPage() {
 
     try {
       const res = await fetch("/api/audit", { method: "POST", body: form });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(error ?? `HTTP ${res.status}`);
+      }
       const accumulated = await consumeSSE(res, (chunk) => {
         setStreamChunks((prev) => [...prev, chunk]);
         setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
       });
-      try { setResult(extractJson(accumulated)); } catch { /* show raw */ }
+      try {
+        const parsed = extractJson<AuditResult>(accumulated);
+        setResult({
+          ...parsed,
+          signals: parsed.signals ?? [],
+          recommendations: parsed.recommendations ?? [],
+          phrasesToAvoid: parsed.phrasesToAvoid ?? [],
+        });
+      } catch { /* show raw chunks */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Audit failed");
     } finally {
@@ -606,13 +633,13 @@ export default function AuditPage() {
           <Separator className="opacity-50" />
 
           {/* Signals */}
-          {result.signals.length > 0 && (
+          {(result.signals?.length ?? 0) > 0 && (
             <div className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Detected Signals ({result.signals.length})
+                Detected Signals ({result.signals?.length ?? 0})
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {result.signals.map((s, i) => (
+                {(result.signals ?? []).map((s, i) => (
                   <div key={i} className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/40 p-3 hover:border-border transition-colors">
                     <Badge variant={PRIORITY_VARIANT[s.severity] ?? "outline"} className="shrink-0 text-xs mt-0.5">
                       {s.severity}
@@ -632,13 +659,13 @@ export default function AuditPage() {
           <Separator className="opacity-50" />
 
           {/* Recommendations */}
-          {result.recommendations.length > 0 && (
+          {(result.recommendations?.length ?? 0) > 0 && (
             <div className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Recommendations ({result.recommendations.length})
+                Recommendations ({result.recommendations?.length ?? 0})
               </h2>
               <div className="space-y-2">
-                {result.recommendations.map((r, i) => (
+                {(result.recommendations ?? []).map((r, i) => (
                   <RecommendationCard key={i} rec={r} />
                 ))}
               </div>

@@ -75,7 +75,7 @@ export class ProfileAuditorAgent implements IAuditAgent {
   ): Promise<AsyncIterable<string>> {
     const { config, goalsContext } = await getGoalsContext();
     const systemPrompt = buildSystemPrompt(goalsContext);
-    return this.claude.streamText(systemPrompt, buildExportMessage(data, siteContent, config.targetCompanies));
+    return this.claude.streamText(systemPrompt, buildExportMessage(data, siteContent, config.targetCompanies), 8192);
   }
 
   async auditFromUrl(url: string): Promise<AsyncIterable<string>> {
@@ -94,6 +94,6 @@ Focus on:
 
 Return your analysis as JSON matching the schema in your instructions.`;
 
-    return this.claude.streamText(systemPrompt, userMessage);
+    return this.claude.streamText(systemPrompt, userMessage, 8192);
   }
 }

@@ -3,7 +3,7 @@ import { AuditProfileUseCase } from "../../../application/AuditProfileUseCase";
 import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // POST /api/audit
 // Accepts multipart form data with:
