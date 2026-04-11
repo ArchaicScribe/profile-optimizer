@@ -142,6 +142,7 @@ function ResponseGenerator({ jobTitle, company, jdSummary }: { jobTitle: string;
                   onChange={(e) => setRevision(e.target.value)}
                   placeholder='e.g. "make it shorter", "ask about remote policy", "sound less formal", "decline more firmly"'
                   rows={2}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && revision.trim() && !generating) { e.preventDefault(); generate(activeType!, revision); } }}
                   className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
                 />
                 <div className="flex gap-2">
