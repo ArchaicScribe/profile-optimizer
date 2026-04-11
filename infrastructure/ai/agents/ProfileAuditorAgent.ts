@@ -22,16 +22,18 @@ When auditing, analyze:
 Output structured analysis with:
 - An overall score (0-100, where 100 = ideal SE/SA candidate for target companies)
 - A list of signals with type (contract_attractor | location_attractor | positive | neutral) and severity (high | medium | low)
-- Prioritized recommendations with category (keywords | location | tone | experience | skills)
-- A list of phrases to avoid: words and patterns that undercut SE/SA positioning. Group by context (solo_contributor | implementation_speak | staffing_agency | geographic | general).
+- Prioritized recommendations with category (keywords | location | tone | experience | skills) and source ("linkedin" if it applies to the LinkedIn profile, "website" if it applies to the personal website, "both" if it applies to both)
+- A list of phrases to avoid: words and patterns that undercut SE/SA positioning. Group by context (solo_contributor | implementation_speak | staffing_agency | geographic | general). For each phrase include: a concrete replacement, the source it appears in ("linkedin" or "website"), the specific section where it appears (e.g. "Headline", "Summary", "NRI North America — Senior Software Engineer", "Skills", "About page"), and a short verbatim excerpt (1-2 sentences) from the actual profile text showing the phrase in context so the candidate knows exactly where to look.
 
 Format your response as valid JSON matching this schema:
 {
   "auditScore": number,
+  "linkedinScore": number (0-100, SA readiness of the LinkedIn profile specifically),
+  "websiteScore": number (0-100, SA readiness of the personal website; omit entirely if no website was provided),
   "signals": [{ "text": string, "type": string, "severity": string }],
-  "recommendations": [{ "title": string, "body": string, "priority": string, "category": string }],
+  "recommendations": [{ "title": string, "body": string, "priority": string, "category": string, "source": "linkedin" | "website" | "both" }],
   "summary": string,
-  "phrasesToAvoid": [{ "phrase": string, "reason": string, "context": string }]
+  "phrasesToAvoid": [{ "phrase": string, "reason": string, "context": string, "replacement": string, "source": "linkedin" | "website", "section": string, "excerpt": string }]
 }`;
 }
 

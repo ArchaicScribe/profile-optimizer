@@ -22,10 +22,20 @@ export interface ResumeResult {
 
 export interface AuditResult {
   auditScore: number;
+  linkedinScore?: number;
+  websiteScore?: number;
   signals: Array<{ text: string; type: string; severity: string }>;
-  recommendations: Array<{ title: string; body: string; priority: string; category: string }>;
+  recommendations: Array<{ title: string; body: string; priority: string; category: string; source?: "linkedin" | "website" | "both" }>;
   summary: string;
-  phrasesToAvoid?: Array<{ phrase: string; reason: string; context: string }>;
+  phrasesToAvoid?: Array<{
+    phrase: string;
+    reason: string;
+    context: string;
+    replacement?: string;
+    source?: "linkedin" | "website";
+    section?: string;
+    excerpt?: string;
+  }>;
 }
 
 // ---- JD Analysis -----------------------------------------------------------
