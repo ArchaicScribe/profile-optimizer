@@ -3,7 +3,7 @@ import { AuditProfileUseCase } from "../../../application/AuditProfileUseCase";
 import { sseStream } from "../../../lib/sseStream";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // POST /api/audit
 // Accepts multipart form data with:
@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
       : useCase.auditFromUrl(url!);
 
     return sseStream(generator);
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (err) {
+    console.error("[/api/audit]", err);
+    const message = err instanceof Error ? err.message : "Invalid request";
+    return Response.json({ error: message }, { status: 400 });
   }
 }

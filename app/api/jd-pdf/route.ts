@@ -7,16 +7,46 @@ import { extractJson } from "../../../lib/extractJson";
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"];
+
+function getExtension(filename: string): string {
+  return filename.slice(filename.lastIndexOf(".")).toLowerCase();
+}
+
+/** Extract plain text from a JD file (DOCX/DOC/TXT). */
+async function extractDocumentText(file: File): Promise<string> {
+  const ext = getExtension(file.name);
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (ext === ".txt") {
+    return buffer.toString("utf-8");
+  }
+
+  // .docx or .doc — dynamic import avoids top-level ESM/CJS bundling issues
+  const mammoth = await import("mammoth");
+  const mod = ("default" in mammoth ? mammoth.default : mammoth) as typeof import("mammoth");
+  const result = await mod.extractRawText({ buffer });
+  return result.value;
+}
+
 // POST /api/jd-pdf
-// Accepts multipart form data with: file (JD PDF, required)
+// Accepts multipart form data with: file (JD — PDF, DOCX, DOC, or TXT, required)
 // Returns: { analysis: JDAnalysis }
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
 
-    if (!file || !file.name.endsWith(".pdf")) {
-      return Response.json({ error: "A PDF file is required." }, { status: 400 });
+    if (!file) {
+      return Response.json({ error: "A file is required." }, { status: 400 });
+    }
+
+    const ext = getExtension(file.name);
+    if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+      return Response.json(
+        { error: `Unsupported file type "${ext}". Please upload a PDF, DOCX, DOC, or TXT file.` },
+        { status: 400 },
+      );
     }
 
     const { goalsContext } = await getGoalsContext();
@@ -33,9 +63,7 @@ Rules:
 - Score honestly - a 90 means genuinely strong fit for this person's stated goals
 - Do not use em-dashes. Return valid JSON only.`;
 
-    const userMessage = `Analyze this job description PDF against the candidate's profile, goals, and hard preferences.
-
-Return JSON with this exact structure:
+    const jsonSchema = `Return JSON with this exact structure:
 {
   "overallFit": "strong" | "moderate" | "poor",
   "fitScore": number (0-100),
@@ -60,15 +88,30 @@ Hard rules for recommendation:
 - "apply" only if fitScore >= 65 and no hard disqualifiers`;
 
     const claude = ClaudeClient.getInstance();
+    let text: string;
 
-    const text = await claude.completeContent(
-      systemPrompt,
-      [{ role: "user", content: [await pdfContentBlock(file), { type: "text", text: userMessage }] as never }],
-      2048,
-    );
+    if (ext === ".pdf") {
+      // Send PDF natively as a document block — Claude can read it directly
+      const userMessage = `Analyze this job description PDF against the candidate's profile, goals, and hard preferences.\n\n${jsonSchema}`;
+      text = await claude.completeContent(
+        systemPrompt,
+        [{ role: "user", content: [await pdfContentBlock(file), { type: "text", text: userMessage }] as never }],
+        2048,
+      );
+    } else {
+      // DOCX / DOC / TXT — extract text first, send as plain text
+      const docText = await extractDocumentText(file);
+      if (!docText.trim()) {
+        return Response.json({ error: "Could not extract text from the file. Try pasting the JD as text instead." }, { status: 422 });
+      }
+      const userMessage = `Analyze this job description against the candidate's profile, goals, and hard preferences.\n\nJOB DESCRIPTION:\n${docText}\n\n${jsonSchema}`;
+      text = await claude.complete(systemPrompt, userMessage, 2048);
+    }
+
     return Response.json({ analysis: extractJson(text) });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "JD PDF analysis failed";
+    console.error("[/api/jd-pdf]", err);
+    const message = err instanceof Error ? err.message : "JD analysis failed";
     return Response.json({ error: message }, { status: 500 });
   }
 }

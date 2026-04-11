@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { JDAnalysis } from "../../lib/types";
-import type { ResponseType } from "../api/response/route";
+import { consumeSSE } from "../../lib/consumeSSE";
+import type { ResponseType, SourceType } from "../api/response/route";
 import {
-  Upload, Loader2, CheckCircle2, AlertCircle, FileText,
-  ChevronDown, ChevronUp, RefreshCw, CheckCircle, XCircle, HelpCircle,
+  Upload, Loader2, CheckCircle2, AlertCircle, FileText, X,
+  ChevronDown, ChevronUp, RefreshCw, CheckCircle, XCircle, HelpCircle, Send, Copy, MessageSquare, Bot,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +41,13 @@ const RESPONSE_CONFIG: Record<ResponseType, { label: string; icon: React.ReactNo
 // ---- File drop zone -------------------------------------------------------
 
 function DropZone({
-  id, accept, file, onFile, label, hint,
+  id, accept, file, onFile, onClear, label, hint,
 }: {
   id: string;
   accept: string;
   file: File | null;
   onFile: (f: File) => void;
+  onClear: () => void;
   label: string;
   hint: string;
 }) {
@@ -77,7 +79,15 @@ function DropZone({
         <div className="flex flex-col items-center gap-1.5">
           <CheckCircle2 size={20} className="text-green-500" />
           <p className="text-sm font-medium">{file.name}</p>
-          <p className="text-xs text-muted-foreground">Click to replace</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <span className="text-xs text-muted-foreground">Click to replace</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onClear(); }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X size={11} /> Remove
+            </button>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1.5">
@@ -203,14 +213,37 @@ function JDResults({ analysis }: { analysis: JDAnalysis }) {
 
 // ---- Response generator ---------------------------------------------------
 
-function ResponseGenerator({ context }: { context: string }) {
+type ChatMsg = { role: "user" | "assistant"; content: string };
+
+const QUICK_PROMPTS = [
+  "Should I add more context?",
+  "Is this appropriate to say?",
+  "Does this sound too eager?",
+  "Should I ask about remote?",
+];
+
+function ResponseGenerator({ context, sourceType, onLogSent }: { context: string; sourceType: SourceType; onLogSent?: (draft: string) => void }) {
   const [activeType, setActiveType] = useState<ResponseType | null>(null);
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [revision, setRevision] = useState("");
+  const [liked, setLiked] = useState("");
+  const [disliked, setDisliked] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showRevision, setShowRevision] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [sentLogged, setSentLogged] = useState(false);
 
-  const generate = async (type: ResponseType, revisionText?: string) => {
+  // Chat state
+  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [streamingReply, setStreamingReply] = useState("");
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  const hasRevisionInput = liked.trim() || disliked.trim() || notes.trim();
+
+  const generate = async (type: ResponseType, isRevision = false) => {
     setActiveType(type);
     setGenerating(true);
     setError(null);
@@ -220,21 +253,71 @@ function ResponseGenerator({ context }: { context: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
+          sourceType,
           jobTitle: "this role",
           company: "this company",
           jdSummary: context,
-          feedback: revisionText,
-          previousMessage: revisionText ? message : undefined,
+          liked: isRevision ? liked : undefined,
+          disliked: isRevision ? disliked : undefined,
+          notes: isRevision ? notes : undefined,
+          previousMessage: isRevision ? message : undefined,
         }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMessage(data.message);
-      setRevision("");
+      setCopied(false);
+      setSentLogged(false);
+      if (isRevision) {
+        setLiked("");
+        setDisliked("");
+        setNotes("");
+        setShowRevision(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const sendChat = async (input: string) => {
+    const question = input.trim();
+    if (!question || chatLoading) return;
+    setChatInput("");
+    const userMsg: ChatMsg = { role: "user", content: question };
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+    setChatLoading(true);
+    setStreamingReply("");
+    try {
+      const res = await fetch("/api/recruiter-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: question,
+          context,
+          responseType: activeType ?? undefined,
+          draftMessage: message || undefined,
+          history: chatHistory,
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(error ?? `HTTP ${res.status}`);
+      }
+      let reply = "";
+      await consumeSSE(res, (chunk) => {
+        reply += chunk;
+        setStreamingReply(reply);
+        if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      });
+      setChatHistory([...newHistory, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setChatHistory([...newHistory, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Chat failed"}` }]);
+    } finally {
+      setChatLoading(false);
+      setStreamingReply("");
     }
   };
 
@@ -245,7 +328,7 @@ function ResponseGenerator({ context }: { context: string }) {
       <p className="text-sm font-medium">Draft a response:</p>
       <div className="flex flex-wrap gap-2">
         {(Object.entries(RESPONSE_CONFIG) as [ResponseType, typeof RESPONSE_CONFIG[ResponseType]][]).map(([type, c]) => (
-          <button key={type} onClick={() => generate(type)} disabled={generating}
+          <button key={type} onClick={() => { setShowRevision(false); generate(type); }} disabled={generating}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${c.btn}`}>
             {c.icon} {c.label}
           </button>
@@ -262,29 +345,188 @@ function ResponseGenerator({ context }: { context: string }) {
             </div>
           ) : (
             <>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
-              <div className="pt-2 border-t border-border/30 space-y-2">
-                <p className="text-sm text-muted-foreground">Tell the AI how to revise it:</p>
-                <textarea
-                  value={revision}
-                  onChange={(e) => setRevision(e.target.value)}
-                  placeholder='e.g. "make it shorter", "ask about remote policy", "decline more firmly", "ask about comp range"'
-                  rows={2}
-                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow"
-                />
-                <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => generate(activeType!, revision)} disabled={!revision.trim() || generating}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors">
-                    <RefreshCw size={13} /> Revise
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap flex-1">{message}</p>
+                <div className="shrink-0 flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(message);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-all ${
+                      copied
+                        ? "border-green-500/40 bg-green-500/10 text-green-500"
+                        : "border-border/40 bg-background/50 text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
+                  >
+                    {copied ? <CheckCircle2 size={11} /> : <Copy size={11} />}
+                    {copied ? "Copied" : "Copy"}
                   </button>
-                  <button onClick={() => generate(activeType!)} disabled={generating}
-                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    <RefreshCw size={13} /> Regenerate from scratch
+                  <button
+                    onClick={() => { onLogSent?.(message); setSentLogged(true); }}
+                    disabled={sentLogged}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-all ${
+                      sentLogged
+                        ? "border-green-500/40 bg-green-500/10 text-green-500"
+                        : "border-border/40 bg-background/50 text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
+                  >
+                    {sentLogged ? <><CheckCircle2 size={11} /> Sent</> : <><Send size={11} /> Mark as sent</>}
                   </button>
                 </div>
               </div>
+
+              <div className="pt-2 border-t border-border/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Revise this draft</p>
+                  <button onClick={() => setShowRevision((v) => !v)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    {showRevision ? "Hide" : "Give feedback"}
+                  </button>
+                </div>
+
+                {showRevision && (
+                  <div className="space-y-3">
+                    {/* What works */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-green-500">What works — keep this</label>
+                      <textarea
+                        value={liked}
+                        onChange={(e) => setLiked(e.target.value)}
+                        placeholder='e.g. "I like the opening line" or "keep it asking about a call"'
+                        rows={2}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && hasRevisionInput && !generating) { e.preventDefault(); generate(activeType!, true); } }}
+                        className="w-full rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500/30 resize-none transition-shadow placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    {/* What to change */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-yellow-500">What to change</label>
+                      <textarea
+                        value={disliked}
+                        onChange={(e) => setDisliked(e.target.value)}
+                        placeholder='e.g. "too formal", "remove the salary mention", "make it shorter", "ask about remote policy instead"'
+                        rows={2}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && hasRevisionInput && !generating) { e.preventDefault(); generate(activeType!, true); } }}
+                        className="w-full rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30 resize-none transition-shadow placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    {/* Editorial notes */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Style / editorial notes</label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder='e.g. "I never start messages with Hi", "I prefer first names only", "I want to sound more senior and less eager"'
+                        rows={2}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && hasRevisionInput && !generating) { e.preventDefault(); generate(activeType!, true); } }}
+                        className="w-full rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-none transition-shadow placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <button
+                        onClick={() => generate(activeType!, true)}
+                        disabled={!hasRevisionInput || generating}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                      >
+                        <RefreshCw size={13} /> Revise
+                      </button>
+                      <button
+                        onClick={() => generate(activeType!)}
+                        disabled={generating}
+                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <RefreshCw size={13} /> Regenerate from scratch
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Chat panel — shown once a draft exists */}
+      {message && (
+        <div className="rounded-xl border border-border/60 bg-card/60 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
+            <Bot size={14} className="text-[oklch(0.6_0.2_280)]" />
+            <span className="text-sm font-medium">Ask a question about this response</span>
+          </div>
+
+          {/* Quick prompts — hide after first message sent */}
+          {chatHistory.length === 0 && (
+            <div className="flex flex-wrap gap-2 px-4 pt-3">
+              {QUICK_PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => sendChat(p)}
+                  disabled={chatLoading}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.6_0.2_280/30%)] bg-[oklch(0.6_0.2_280/6%)] px-3 py-1.5 text-xs font-medium text-[oklch(0.6_0.2_280)] hover:bg-[oklch(0.6_0.2_280/12%)] disabled:opacity-50 transition-colors"
+                >
+                  <MessageSquare size={10} />
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Chat history */}
+          {(chatHistory.length > 0 || chatLoading) && (
+            <div ref={chatScrollRef} className="space-y-3 h-64 overflow-y-auto px-4 py-3">
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                    msg.role === "user"
+                      ? "bg-[oklch(0.6_0.2_280)] text-white"
+                      : "bg-muted/50 border border-border/60 text-foreground"
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && streamingReply && (
+                <div className="flex gap-2 justify-start">
+                  <div className="max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-muted/50 border border-border/60">
+                    {streamingReply}
+                    <span className="inline-block w-1.5 h-4 bg-[oklch(0.6_0.2_280)] ml-1 animate-pulse rounded-sm" />
+                  </div>
+                </div>
+              )}
+              {chatLoading && !streamingReply && (
+                <div className="flex gap-2 justify-start">
+                  <div className="rounded-xl px-4 py-2.5 bg-muted/50 border border-border/60">
+                    <Loader2 size={13} className="animate-spin text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="flex gap-2 px-4 py-3 border-t border-border/40">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(chatInput); } }}
+              placeholder="Should I add more context? Is this tone right? ..."
+              disabled={chatLoading}
+              className="flex-1 rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow disabled:opacity-50"
+            />
+            <button
+              onClick={() => sendChat(chatInput)}
+              disabled={!chatInput.trim() || chatLoading}
+              className="inline-flex items-center justify-center rounded-lg bg-[oklch(0.6_0.2_280)] text-white w-9 h-9 shrink-0 hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+            >
+              <Send size={14} />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -293,8 +535,17 @@ function ResponseGenerator({ context }: { context: string }) {
 
 // ---- Main page ------------------------------------------------------------
 
+const SOURCE_TYPES: { value: SourceType; label: string; hint: string }[] = [
+  { value: "email",    label: "Email",             hint: "Formal email reply, up to 180 words" },
+  { value: "linkedin", label: "LinkedIn Message",  hint: "Short, conversational, under 100 words" },
+  { value: "inmail",   label: "LinkedIn InMail",   hint: "Polished cold outreach reply, under 150 words" },
+];
+
+type ThreadMsg = { role: "recruiter" | "you"; content: string };
+
 export default function RecruiterPage() {
   const [message, setMessage] = useState("");
+  const [sourceType, setSourceType] = useState<SourceType>("linkedin");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [jdText, setJdText] = useState("");
@@ -302,19 +553,47 @@ export default function RecruiterPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [jdAnalysis, setJdAnalysis] = useState<JDAnalysis | null>(null);
   const [responseContext, setResponseContext] = useState<string>("");
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analyzed, setAnalyzed] = useState(false);
+  const [thread, setThread] = useState<ThreadMsg[]>([]);
+  const [replyInput, setReplyInput] = useState("");
 
-  const analyze = async () => {
-    if (!message.trim()) return;
+  const resetConversation = () => {
+    setThread([]);
+    setAnalyzed(false);
+    setJdAnalysis(null);
+    setResponseContext("");
+    setMessage("");
+    setReplyInput("");
+    setShowResponse(false);
+    setError(null);
+    setChatHistory([]);
+    setChatInput("");
+  };
+
+  const analyze = async (overrideMsg?: string) => {
+    const msgToAnalyze = (overrideMsg ?? message).trim();
+    if (!msgToAnalyze) return;
     setAnalyzing(true);
     setError(null);
     setJdAnalysis(null);
     setAnalyzed(false);
     setShowResponse(false);
+    setChatHistory([]);
+    setChatInput("");
+
+    // Capture current thread before updating (for building context)
+    const threadSnapshot = thread;
+    setThread(prev => [...prev, { role: "recruiter", content: msgToAnalyze }]);
+    setReplyInput("");
 
     try {
+      let baseContext = msgToAnalyze;
+
       // If JD provided, analyze it
       if (jdMode === "pdf" && jdFile) {
         const form = new FormData();
@@ -323,7 +602,7 @@ export default function RecruiterPage() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setJdAnalysis(data.analysis);
-        setResponseContext(data.analysis.summary ?? message);
+        baseContext = data.analysis.summary ?? msgToAnalyze;
       } else if (jdMode === "text" && jdText.trim()) {
         const res = await fetch("/api/jd", {
           method: "POST",
@@ -333,9 +612,21 @@ export default function RecruiterPage() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setJdAnalysis(data.analysis);
-        setResponseContext(data.analysis.summary ?? message);
+        baseContext = data.analysis.summary ?? msgToAnalyze;
+      }
+
+      // Build context with thread history for the response generator
+      if (threadSnapshot.length > 0) {
+        const lines = ["## Previous conversation context", ""];
+        threadSnapshot.forEach((m) => {
+          const label = m.role === "recruiter" ? "Recruiter" : "You (sent)";
+          const preview = m.content.length > 400 ? m.content.slice(0, 400) + "..." : m.content;
+          lines.push(`${label}:\n${preview}`, "");
+        });
+        lines.push("## Their latest message", "", msgToAnalyze);
+        setResponseContext(lines.join("\n"));
       } else {
-        setResponseContext(message);
+        setResponseContext(baseContext);
       }
 
       setAnalyzed(true);
@@ -359,14 +650,75 @@ export default function RecruiterPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Inputs */}
         <div className="space-y-5">
+          {/* Thread timeline */}
+          {thread.length > 0 && (
+            <Card className="border-border/60 bg-card/60">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <MessageSquare size={13} className="text-muted-foreground" />
+                    Conversation Thread
+                    <span className="text-xs text-muted-foreground font-normal">({thread.length} message{thread.length !== 1 ? "s" : ""})</span>
+                  </CardTitle>
+                  <button
+                    onClick={resetConversation}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Start over
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                {thread.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === "you" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                      msg.role === "you"
+                        ? "bg-[oklch(0.6_0.2_280/15%)] border border-[oklch(0.6_0.2_280/25%)] text-foreground"
+                        : "bg-muted/40 border border-border/50 text-muted-foreground"
+                    }`}>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1 opacity-60">
+                        {msg.role === "you" ? "You (sent)" : "Recruiter"}
+                      </p>
+                      <p className="whitespace-pre-wrap line-clamp-3">{msg.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Recruiter message */}
           <Card className="border-border/60 bg-card/60">
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <FileText size={15} className="text-muted-foreground" />
-                <CardTitle className="text-base">Recruiter Message</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FileText size={15} className="text-muted-foreground" />
+                  <CardTitle className="text-base">Recruiter Message</CardTitle>
+                </div>
+                {/* Source type toggle */}
+                <div className="flex gap-0.5 p-0.5 rounded-lg bg-muted/40 shrink-0">
+                  {SOURCE_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSourceType(value)}
+                      title={SOURCE_TYPES.find(s => s.value === value)?.hint}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                        sourceType === value
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <CardDescription>Paste the email, LinkedIn message, or InMail in full.</CardDescription>
+              <CardDescription>
+                Paste the full message below.{" "}
+                <span className="text-muted-foreground/70">
+                  {SOURCE_TYPES.find(s => s.value === sourceType)?.hint}
+                </span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <textarea
@@ -392,7 +744,7 @@ export default function RecruiterPage() {
             <CardContent className="space-y-3">
               {/* Mode toggle */}
               <div className="flex gap-1 p-1 rounded-lg bg-muted/40 w-fit">
-                {([["pdf", "Upload PDF"], ["text", "Paste Text"]] as const).map(([mode, label]) => (
+                {([["pdf", "Upload File"], ["text", "Paste Text"]] as const).map(([mode, label]) => (
                   <button key={mode} onClick={() => setJdMode(mode)}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                       jdMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -403,9 +755,9 @@ export default function RecruiterPage() {
               </div>
 
               {jdMode === "pdf" && (
-                <DropZone id="jd-pdf" accept=".pdf" file={jdFile} onFile={setJdFile}
-                  label="Drop JD PDF here or click to browse"
-                  hint="Compared against your goals, target roles, and hard preferences" />
+                <DropZone id="jd-pdf" accept=".pdf,.docx,.doc,.txt" file={jdFile} onFile={setJdFile} onClear={() => setJdFile(null)}
+                  label="Drop JD here or click to browse"
+                  hint="PDF, DOCX, DOC, or TXT — compared against your goals and hard preferences" />
               )}
 
               {jdMode === "text" && (
@@ -428,7 +780,7 @@ export default function RecruiterPage() {
               <CardDescription>Attach your resume for a personalized fit assessment and tailored response drafts.</CardDescription>
             </CardHeader>
             <CardContent>
-              <DropZone id="resume-pdf" accept=".pdf,.docx" file={resumeFile} onFile={setResumeFile}
+              <DropZone id="resume-pdf" accept=".pdf,.docx" file={resumeFile} onFile={setResumeFile} onClear={() => setResumeFile(null)}
                 label="Drop PDF or DOCX here, or click to browse"
                 hint="Used to personalize the fit assessment and response tone" />
             </CardContent>
@@ -440,10 +792,37 @@ export default function RecruiterPage() {
             </div>
           )}
 
-          <button onClick={analyze} disabled={analyzing || !message.trim()}
+          <button onClick={() => analyze()} disabled={analyzing || !message.trim()}
             className="inline-flex items-center gap-2 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-6 py-2.5 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors">
             {analyzing ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : "Analyze Message"}
           </button>
+
+          {/* Enter their reply — shown after a response has been marked as sent */}
+          {thread.some(m => m.role === "you") && (
+            <Card className="border-[oklch(0.6_0.2_280/30%)] bg-[oklch(0.6_0.2_280/4%)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">They replied — enter their next message</CardTitle>
+                <CardDescription>Paste their follow-up and analyze it with the full conversation context.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <textarea
+                  value={replyInput}
+                  onChange={(e) => setReplyInput(e.target.value)}
+                  placeholder={"Paste their reply here..."}
+                  rows={5}
+                  className="w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] resize-y transition-shadow"
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && replyInput.trim() && !analyzing) { e.preventDefault(); analyze(replyInput); } }}
+                />
+                <button
+                  onClick={() => analyze(replyInput)}
+                  disabled={!replyInput.trim() || analyzing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-5 py-2 text-sm font-medium hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                >
+                  {analyzing ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : "Analyze Reply"}
+                </button>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right: Results */}
@@ -484,6 +863,124 @@ export default function RecruiterPage() {
                 </Card>
               )}
 
+              {/* JD follow-up chat */}
+              {jdAnalysis && (
+                <Card className="border-border/60 bg-card/60">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Ask About This Analysis</CardTitle>
+                    <CardDescription>
+                      Ask why something was flagged, what signals triggered a red flag, or anything else about this result.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Suggested questions */}
+                    {chatHistory.length === 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "How did you know this was a staffing agency?",
+                          "Why did you flag this as a contract role?",
+                          "What specific language triggered the government work flag?",
+                          "What's missing from my profile for this role?",
+                          "Why did you score this below 70?",
+                        ].map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => setChatInput(q)}
+                            className="rounded-full border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-[oklch(0.6_0.2_280/40%)] transition-colors"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Chat history */}
+                    {chatHistory.length > 0 && (
+                      <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                        {chatHistory.map((msg, i) => (
+                          <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                            {msg.role === "assistant" && (
+                              <div className="w-5 h-5 rounded-full bg-[oklch(0.6_0.2_280/20%)] border border-[oklch(0.6_0.2_280/30%)] flex items-center justify-center shrink-0 mt-0.5">
+                                <span className="text-[9px] font-bold text-[oklch(0.6_0.2_280)]">AI</span>
+                              </div>
+                            )}
+                            <div className={`rounded-xl px-3 py-2 text-sm max-w-[85%] leading-relaxed ${
+                              msg.role === "user"
+                                ? "bg-[oklch(0.6_0.2_280/15%)] border border-[oklch(0.6_0.2_280/25%)] text-foreground"
+                                : "bg-muted/40 border border-border/40 text-foreground"
+                            }`}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div className="flex gap-2.5 justify-start">
+                            <div className="w-5 h-5 rounded-full bg-[oklch(0.6_0.2_280/20%)] border border-[oklch(0.6_0.2_280/30%)] flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="text-[9px] font-bold text-[oklch(0.6_0.2_280)]">AI</span>
+                            </div>
+                            <div className="rounded-xl px-3 py-2 bg-muted/40 border border-border/40">
+                              <Loader2 size={13} className="animate-spin text-muted-foreground" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Input */}
+                    {(() => {
+                      const sendChat = async () => {
+                        const q = chatInput.trim();
+                        if (!q || chatLoading || !jdAnalysis) return;
+                        const newHistory = [...chatHistory, { role: "user" as const, content: q }];
+                        setChatHistory(newHistory);
+                        setChatInput("");
+                        setChatLoading(true);
+                        try {
+                          const res = await fetch("/api/jd-chat", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ question: q, analysis: jdAnalysis, jdText, history: chatHistory }),
+                          });
+                          const answer = await consumeSSE(res, (_, acc) => {
+                            setChatHistory([...newHistory, { role: "assistant", content: acc }]);
+                          });
+                          setChatHistory([...newHistory, { role: "assistant", content: answer }]);
+                        } catch {
+                          setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
+                        } finally {
+                          setChatLoading(false);
+                        }
+                      };
+                      return (
+                        <div className="flex gap-2">
+                          <input
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                            placeholder="How did you know this was a contract role?"
+                            disabled={chatLoading}
+                            className="flex-1 rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow disabled:opacity-50"
+                          />
+                          <button
+                            disabled={!chatInput.trim() || chatLoading}
+                            onClick={sendChat}
+                            className="rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                          >
+                            <Send size={14} />
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {chatHistory.length > 0 && (
+                      <button onClick={() => setChatHistory([])} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        Clear conversation
+                      </button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               <Separator className="opacity-50" />
 
               {/* Response generator */}
@@ -500,7 +997,11 @@ export default function RecruiterPage() {
                 </CardHeader>
                 {showResponse && (
                   <CardContent>
-                    <ResponseGenerator context={responseContext} />
+                    <ResponseGenerator
+                      context={responseContext}
+                      sourceType={sourceType}
+                      onLogSent={(draft) => setThread(prev => [...prev, { role: "you", content: draft }])}
+                    />
                   </CardContent>
                 )}
               </Card>

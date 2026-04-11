@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
   Loader2, Upload, FileText, RefreshCw, Mail,
-  ChevronDown, ChevronUp, MessageSquare, Building2, UserRound,
+  ChevronDown, ChevronUp, MessageSquare, Building2, UserRound, Briefcase,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
