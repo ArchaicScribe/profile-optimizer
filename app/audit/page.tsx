@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { consumeSSE } from "../../lib/consumeSSE";
 import { extractJson } from "../../lib/extractJson";
-import type { AuditResult, JDComparison, ResumeResult } from "../../lib/types";
+import type { AuditResult, ChatMessage, JDComparison, ResumeResult } from "../../lib/types";
 import { Upload, Link2, Loader2, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, FileText, Wand2, Copy, Check, Send, MessageSquare, Bot, Sparkles, Target } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +38,6 @@ const SIGNAL_TYPE_COLOR: Record<string, string> = {
   positive: "text-green-500",
   neutral: "text-muted-foreground",
 };
-
-type ChatMsg = { role: "user" | "assistant"; content: string };
 
 type PhraseEntry = NonNullable<AuditResult["phrasesToAvoid"]>[0];
 
@@ -77,27 +75,27 @@ function ScoreRing({ score, label, sublabel }: { score: number; label: string; s
   );
 }
 
+const QUICK_PROMPTS = [
+  "What should I fix first?",
+  "What's my biggest gap?",
+  "How do I improve my SA positioning?",
+  "What keywords am I missing?",
+];
+
 function AuditChatPanel({ auditResult, resumeResult }: { auditResult: AuditResult | null; resumeResult: ResumeResult | null }) {
-  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [streamingReply, setStreamingReply] = useState("");
   const [showChips, setShowChips] = useState(true);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  const QUICK_PROMPTS = [
-    "What should I fix first?",
-    "What's my biggest gap?",
-    "How do I improve my SA positioning?",
-    "What keywords am I missing?",
-  ];
-
   const sendChat = async (input: string) => {
     const question = input.trim();
     if (!question || chatLoading) return;
     setChatInput("");
     setShowChips(false);
-    const userMsg: ChatMsg = { role: "user", content: question };
+    const userMsg: ChatMessage = { role: "user", content: question };
     const newHistory = [...chatHistory, userMsg];
     setChatHistory(newHistory);
     setChatLoading(true);
@@ -191,7 +189,6 @@ function AuditChatPanel({ auditResult, resumeResult }: { auditResult: AuditResul
           </div>
         )}
 
-        {/* Input row */}
         <div className="flex gap-2">
           <input
             type="text"
@@ -217,7 +214,7 @@ function AuditChatPanel({ auditResult, resumeResult }: { auditResult: AuditResul
 
 function PhraseCard({ phrase: p }: { phrase: PhraseEntry }) {
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [streamingReply, setStreamingReply] = useState("");
@@ -230,7 +227,7 @@ function PhraseCard({ phrase: p }: { phrase: PhraseEntry }) {
     const question = input.trim();
     if (!question || chatLoading) return;
     setChatInput("");
-    const userMsg: ChatMsg = { role: "user", content: question };
+    const userMsg: ChatMessage = { role: "user", content: question };
     const newHistory = [...chatHistory, userMsg];
     setChatHistory(newHistory);
     setChatLoading(true);
@@ -284,13 +281,9 @@ function PhraseCard({ phrase: p }: { phrase: PhraseEntry }) {
       {/* Where it appears */}
       {(p.source || p.section) && (
         <div className="flex items-center gap-2 flex-wrap">
-          {p.source && (
-            <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${
-              p.source === "linkedin"
-                ? "border-blue-500/40 bg-blue-500/5 text-blue-400"
-                : "border-purple-500/40 bg-purple-500/5 text-purple-400"
-            }`}>
-              {p.source === "linkedin" ? "LinkedIn" : "Website"}
+          {p.source && SOURCE_LABEL[p.source] && (
+            <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium bg-transparent ${SOURCE_LABEL[p.source].className}`}>
+              {SOURCE_LABEL[p.source].label}
             </span>
           )}
           {p.section && (
@@ -394,26 +387,22 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [currentText, setCurrentText] = useState("");
   const [rewriting, setRewriting] = useState(false);
-  const [rewriteChunks, setRewriteChunks] = useState<string[]>([]);
+  const [rewriteText, setRewriteText] = useState("");
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Chat state
-  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [streamingReply, setStreamingReply] = useState("");
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const rewriteOutputRef = useRef<HTMLDivElement>(null);
 
-  const rewriteOutput = rewriteChunks.join("");
-
   const generateRewrite = async () => {
     if (!currentText.trim()) return;
     setRewriting(true);
-    setRewriteChunks([]);
+    setRewriteText("");
     setRewriteError(null);
-    // Reset chat when regenerating
     setChatHistory([]);
     try {
       const res = await fetch("/api/audit-rewrite", {
@@ -426,7 +415,7 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
         throw new Error(error ?? `HTTP ${res.status}`);
       }
       await consumeSSE(res, (chunk) => {
-        setRewriteChunks((prev) => [...prev, chunk]);
+        setRewriteText((prev) => prev + chunk);
       });
     } catch (err) {
       setRewriteError(err instanceof Error ? err.message : "Rewrite failed");
@@ -440,7 +429,7 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
     if (!question || chatLoading) return;
     setChatInput("");
 
-    const userMsg: ChatMsg = { role: "user", content: question };
+    const userMsg: ChatMessage = { role: "user", content: question };
     const newHistory = [...chatHistory, userMsg];
     setChatHistory(newHistory);
     setChatLoading(true);
@@ -454,7 +443,7 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
           message: question,
           recommendation: rec,
           currentText: currentText.trim(),
-          rewriteOutput: rewriteOutput || undefined,
+          rewriteOutput: rewriteText || undefined,
           history: chatHistory,
         }),
       });
@@ -489,8 +478,8 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
   };
 
   const copyRewrite = () => {
-    const { rewritten } = parseRewrite(rewriteOutput);
-    navigator.clipboard.writeText(rewritten || rewriteOutput.trim());
+    const { rewritten } = parseRewrite(rewriteText);
+    navigator.clipboard.writeText(rewritten || rewriteText.trim());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -526,7 +515,7 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
           {/* Rewrite + Chat section */}
           <div className="mt-4">
             <button
-              onClick={() => { setRewriteOpen((v) => !v); setRewriteChunks([]); setRewriteError(null); setChatHistory([]); }}
+              onClick={() => { setRewriteOpen((v) => !v); setRewriteText(""); setRewriteError(null); setChatHistory([]); }}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[oklch(0.6_0.2_280)] hover:text-[oklch(0.55_0.2_280)] transition-colors"
             >
               <Wand2 size={12} />
@@ -558,20 +547,17 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
                   </p>
                 )}
 
-                {/* Rewrite output */}
-                {(rewriting || rewriteOutput) && (
-                  <div ref={rewriteOutputRef} className="rounded-xl border border-[oklch(0.6_0.2_280/20%)] bg-[oklch(0.6_0.2_280/5%)] overflow-hidden">
-                    {rewriting ? (
-                      /* Streaming state — plain text with cursor */
-                      <div className="px-5 py-5 text-base leading-7 whitespace-pre-wrap tracking-normal text-foreground/80">
-                        {rewriteOutput}
-                        <span className="inline-block w-2 h-5 bg-[oklch(0.6_0.2_280)] ml-1 animate-pulse rounded-sm" />
-                      </div>
-                    ) : (() => {
-                      const { rewritten, changes } = parseRewrite(rewriteOutput);
-                      return (
+                {(rewriting || rewriteText) && (() => {
+                  const { rewritten, changes } = rewriting ? { rewritten: "", changes: [] } : parseRewrite(rewriteText);
+                  return (
+                    <div ref={rewriteOutputRef} className="rounded-xl border border-[oklch(0.6_0.2_280/20%)] bg-[oklch(0.6_0.2_280/5%)] overflow-hidden">
+                      {rewriting ? (
+                        <div className="px-5 py-5 text-base leading-7 whitespace-pre-wrap tracking-normal text-foreground/80">
+                          {rewriteText}
+                          <span className="inline-block w-2 h-5 bg-[oklch(0.6_0.2_280)] ml-1 animate-pulse rounded-sm" />
+                        </div>
+                      ) : (
                         <>
-                          {/* Rewritten section */}
                           <div className="px-5 pt-5 pb-4">
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-xs font-semibold uppercase tracking-widest text-[oklch(0.6_0.2_280)]">Rewritten</span>
@@ -583,11 +569,10 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
                               </button>
                             </div>
                             <p className="text-base leading-8 tracking-normal text-foreground whitespace-pre-wrap">
-                              {rewritten || rewriteOutput}
+                              {rewritten || rewriteText}
                             </p>
                           </div>
 
-                          {/* What changed section */}
                           {changes.length > 0 && (
                             <div className="px-5 pb-5 pt-3 border-t border-[oklch(0.6_0.2_280/12%)]">
                               <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground block mb-3">What changed</span>
@@ -602,20 +587,18 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
                             </div>
                           )}
                         </>
-                      );
-                    })()}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  );
+                })()}
 
-                {/* Chat thread — shown once a rewrite exists or any chat has started */}
-                {(rewriteOutput || chatHistory.length > 0) && !rewriting && (
+                {(rewriteText || chatHistory.length > 0) && !rewriting && (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MessageSquare size={11} />
                       <span>Follow up — ask questions, request changes, or provide feedback</span>
                     </div>
 
-                    {/* Message history */}
                     {chatHistory.length > 0 && (
                       <div ref={chatScrollRef} className="space-y-3 h-64 overflow-y-auto rounded-lg border border-border/40 bg-muted/20 p-3">
                         {chatHistory.map((msg, i) => (
@@ -647,7 +630,6 @@ function RecommendationCard({ rec }: { rec: AuditResult["recommendations"][0] })
                       </div>
                     )}
 
-                    {/* Input row */}
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -692,7 +674,7 @@ export default function AuditPage() {
   const [streaming, setStreaming] = useState(false);
   const [streamChunks, setStreamChunks] = useState<string[]>([]);
   const [result, setResult] = useState<AuditResult | null>(null);
-  const [recSourceFilter, setRecSourceFilter] = useState<"all" | "linkedin" | "website" | "both">("all");
+  const [recSourceFilter, setRecSourceFilter] = useState<"all" | keyof typeof SOURCE_LABEL>("all");
   const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<HTMLDivElement>(null);
@@ -743,7 +725,7 @@ export default function AuditPage() {
         }
         const accumulated = await consumeSSE(res, (chunk) => {
           setStreamChunks((prev) => [...prev, chunk]);
-          setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
+          requestAnimationFrame(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }));
         });
         try {
           const parsed = extractJson<ResumeResult>(accumulated);
@@ -785,7 +767,7 @@ export default function AuditPage() {
       }
       const accumulated = await consumeSSE(res, (chunk) => {
         setStreamChunks((prev) => [...prev, chunk]);
-        setTimeout(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }), 10);
+        requestAnimationFrame(() => streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" }));
       });
       try {
         const parsed = extractJson<AuditResult>(accumulated);
@@ -802,6 +784,12 @@ export default function AuditPage() {
       setStreaming(false);
     }
   };
+
+  const linkedinScore = result ? (result.linkedinScore ?? result.auditScore) : 0;
+  const scoreList = result ? [linkedinScore, ...(result.websiteScore != null ? [result.websiteScore] : []), ...(resumeResult ? [resumeResult.score] : [])] : [];
+  const overallScore = scoreList.length > 0 ? Math.round(scoreList.reduce((a, b) => a + b, 0) / scoreList.length) : 0;
+  const positiveSignals = result ? (result.signals ?? []).filter((s) => s.type === "positive") : [];
+  const negativeSignals = result ? (result.signals ?? []).filter((s) => s.type !== "positive") : [];
 
   return (
     <div className="space-y-8">
@@ -1242,84 +1230,69 @@ export default function AuditPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {(() => {
-                const linkedinScore = result.linkedinScore ?? result.auditScore;
-                const scores: number[] = [linkedinScore];
-                if (result.websiteScore != null) scores.push(result.websiteScore);
-                if (resumeResult) scores.push(resumeResult.score);
-                const overall = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-                return (
-                  <>
-                    <div className="flex flex-wrap justify-center gap-12">
-                      <ScoreRing score={linkedinScore} label="LinkedIn Profile" sublabel="SE/SA positioning" />
-                      {result.websiteScore != null && (
-                        <ScoreRing score={result.websiteScore} label="Personal Website" sublabel="SE/SA positioning" />
-                      )}
-                      {resumeResult && (
-                        <ScoreRing score={resumeResult.score} label="Resume" sublabel="SE/SA positioning" />
-                      )}
-                      <ScoreRing score={overall} label="Overall" sublabel="composite score" />
-                    </div>
-                    {result.summary && (
-                      <p className="text-sm text-muted-foreground leading-relaxed text-center max-w-2xl mx-auto">{result.summary}</p>
-                    )}
-                  </>
-                );
-              })()}
+              <>
+                <div className="flex flex-wrap justify-center gap-12">
+                  <ScoreRing score={linkedinScore} label="LinkedIn Profile" sublabel="SE/SA positioning" />
+                  {result.websiteScore != null && (
+                    <ScoreRing score={result.websiteScore} label="Personal Website" sublabel="SE/SA positioning" />
+                  )}
+                  {resumeResult && (
+                    <ScoreRing score={resumeResult.score} label="Resume" sublabel="SE/SA positioning" />
+                  )}
+                  <ScoreRing score={overallScore} label="Overall" sublabel="composite score" />
+                </div>
+                {result.summary && (
+                  <p className="text-sm text-muted-foreground leading-relaxed text-center max-w-2xl mx-auto">{result.summary}</p>
+                )}
+              </>
             </CardContent>
           </Card>
 
           <Separator className="opacity-50" />
 
-          {/* Signals */}
-          {(result.signals?.length ?? 0) > 0 && (() => {
-            const signals = result.signals ?? [];
-            const positiveSignals = signals.filter(s => s.type === "positive");
-            const negativeSignals = signals.filter(s => s.type !== "positive");
-            return (
-              <div className="space-y-4">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  Detected Signals
-                  <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{signals.length}</span>
-                </h2>
-                {positiveSignals.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-green-500 uppercase tracking-wide">Positive Signals ({positiveSignals.length})</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {positiveSignals.map((s, i) => (
-                        <div key={i} className="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-                          <Badge variant={PRIORITY_VARIANT[s.severity] ?? "outline"} className="shrink-0 text-xs mt-0.5">
-                            {s.severity}
-                          </Badge>
-                          <p className="text-sm text-muted-foreground leading-relaxed">{s.text}</p>
-                        </div>
-                      ))}
-                    </div>
+          {(result.signals?.length ?? 0) > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                Detected Signals
+                <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{result.signals!.length}</span>
+              </h2>
+              {positiveSignals.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-green-500 uppercase tracking-wide">Positive Signals ({positiveSignals.length})</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {positiveSignals.map((s, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+                        <Badge variant={PRIORITY_VARIANT[s.severity] ?? "outline"} className="shrink-0 text-xs mt-0.5">
+                          {s.severity}
+                        </Badge>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{s.text}</p>
+                      </div>
+                    ))}
                   </div>
-                )}
-                {negativeSignals.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-destructive uppercase tracking-wide">Risk Signals ({negativeSignals.length})</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {negativeSignals.map((s, i) => (
-                        <div key={i} className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/40 p-3 hover:border-border transition-colors">
-                          <Badge variant={PRIORITY_VARIANT[s.severity] ?? "outline"} className="shrink-0 text-xs mt-0.5">
-                            {s.severity}
-                          </Badge>
-                          <div className="min-w-0">
-                            <p className={`text-sm font-medium capitalize ${SIGNAL_TYPE_COLOR[s.type] ?? ""}`}>
-                              {s.type.replace(/_/g, " ")}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{s.text}</p>
-                          </div>
+                </div>
+              )}
+              {negativeSignals.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-destructive uppercase tracking-wide">Risk Signals ({negativeSignals.length})</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {negativeSignals.map((s, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/40 p-3 hover:border-border transition-colors">
+                        <Badge variant={PRIORITY_VARIANT[s.severity] ?? "outline"} className="shrink-0 text-xs mt-0.5">
+                          {s.severity}
+                        </Badge>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium capitalize ${SIGNAL_TYPE_COLOR[s.type] ?? ""}`}>
+                            {s.type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{s.text}</p>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            );
-          })()}
+                </div>
+              )}
+            </div>
+          )}
 
           <Separator className="opacity-50" />
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { JDAnalysis } from "../../lib/types";
+import type { ChatMessage, JDAnalysis } from "../../lib/types";
 import { consumeSSE } from "../../lib/consumeSSE";
 import type { ResponseType, SourceType } from "../api/response/route";
 import {
@@ -213,8 +213,6 @@ function JDResults({ analysis }: { analysis: JDAnalysis }) {
 
 // ---- Response generator ---------------------------------------------------
 
-type ChatMsg = { role: "user" | "assistant"; content: string };
-
 const QUICK_PROMPTS = [
   "Should I add more context?",
   "Is this appropriate to say?",
@@ -234,8 +232,7 @@ function ResponseGenerator({ context, sourceType, onLogSent }: { context: string
   const [copied, setCopied] = useState(false);
   const [sentLogged, setSentLogged] = useState(false);
 
-  // Chat state
-  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [streamingReply, setStreamingReply] = useState("");
@@ -285,7 +282,7 @@ function ResponseGenerator({ context, sourceType, onLogSent }: { context: string
     const question = input.trim();
     if (!question || chatLoading) return;
     setChatInput("");
-    const userMsg: ChatMsg = { role: "user", content: question };
+    const userMsg: ChatMessage = { role: "user", content: question };
     const newHistory = [...chatHistory, userMsg];
     setChatHistory(newHistory);
     setChatLoading(true);
@@ -459,7 +456,6 @@ function ResponseGenerator({ context, sourceType, onLogSent }: { context: string
             <span className="text-sm font-medium">Ask a question about this response</span>
           </div>
 
-          {/* Quick prompts — hide after first message sent */}
           {chatHistory.length === 0 && (
             <div className="flex flex-wrap gap-2 px-4 pt-3">
               {QUICK_PROMPTS.map((p) => (
@@ -476,7 +472,6 @@ function ResponseGenerator({ context, sourceType, onLogSent }: { context: string
             </div>
           )}
 
-          {/* Chat history */}
           {(chatHistory.length > 0 || chatLoading) && (
             <div ref={chatScrollRef} className="space-y-3 h-64 overflow-y-auto px-4 py-3">
               {chatHistory.map((msg, i) => (
@@ -508,7 +503,6 @@ function ResponseGenerator({ context, sourceType, onLogSent }: { context: string
             </div>
           )}
 
-          {/* Input */}
           <div className="flex gap-2 px-4 py-3 border-t border-border/40">
             <input
               type="text"
@@ -553,7 +547,7 @@ export default function RecruiterPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [jdAnalysis, setJdAnalysis] = useState<JDAnalysis | null>(null);
   const [responseContext, setResponseContext] = useState<string>("");
-  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
@@ -586,7 +580,6 @@ export default function RecruiterPage() {
     setChatHistory([]);
     setChatInput("");
 
-    // Capture current thread before updating (for building context)
     const threadSnapshot = thread;
     setThread(prev => [...prev, { role: "recruiter", content: msgToAnalyze }]);
     setReplyInput("");
@@ -594,7 +587,6 @@ export default function RecruiterPage() {
     try {
       let baseContext = msgToAnalyze;
 
-      // If JD provided, analyze it
       if (jdMode === "pdf" && jdFile) {
         const form = new FormData();
         form.append("file", jdFile);
@@ -615,7 +607,6 @@ export default function RecruiterPage() {
         baseContext = data.analysis.summary ?? msgToAnalyze;
       }
 
-      // Build context with thread history for the response generator
       if (threadSnapshot.length > 0) {
         const lines = ["## Previous conversation context", ""];
         threadSnapshot.forEach((m) => {
@@ -894,7 +885,6 @@ export default function RecruiterPage() {
                       </div>
                     )}
 
-                    {/* Chat history */}
                     {chatHistory.length > 0 && (
                       <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                         {chatHistory.map((msg, i) => (
@@ -926,7 +916,6 @@ export default function RecruiterPage() {
                       </div>
                     )}
 
-                    {/* Input */}
                     {(() => {
                       const sendChat = async () => {
                         const q = chatInput.trim();
