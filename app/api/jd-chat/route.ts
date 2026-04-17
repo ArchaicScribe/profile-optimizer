@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { sseStream } from "../../../lib/sseStream";
+import { apiError } from "../../../lib/utils";
 import type { JDAnalysis } from "../../../lib/types";
 
 export const runtime = "nodejs";
@@ -57,10 +58,6 @@ Answer the user's follow-up questions about this analysis. Be direct and specifi
       claude.streamContent(systemPrompt, messages, 1024),
     );
   } catch (err) {
-    console.error("[/api/jd-chat]", err);
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Chat failed" },
-      { status: 500 },
-    );
+    return apiError(err, "Chat failed");
   }
 }

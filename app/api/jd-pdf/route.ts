@@ -3,6 +3,7 @@ import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { extractJson } from "../../../lib/extractJson";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -110,8 +111,6 @@ Hard rules for recommendation:
 
     return Response.json({ analysis: extractJson(text) });
   } catch (err) {
-    console.error("[/api/jd-pdf]", err);
-    const message = err instanceof Error ? err.message : "JD analysis failed";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "JD analysis failed");
   }
 }

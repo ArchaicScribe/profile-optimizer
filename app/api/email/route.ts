@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -131,7 +132,6 @@ export async function POST(req: NextRequest) {
 
     return Response.json({ email: text.trim() });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate email";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "Failed to generate email");
   }
 }

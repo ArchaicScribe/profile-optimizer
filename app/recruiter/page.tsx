@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { ChatMessage, JDAnalysis } from "../../lib/types";
+import type { ChatMessage, JDAnalysis, MessageScore } from "../../lib/types";
 import { consumeSSE } from "../../lib/consumeSSE";
 import type { ResponseType, SourceType } from "../api/response/route";
 import {
@@ -207,6 +207,82 @@ function JDResults({ analysis }: { analysis: JDAnalysis }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---- Message score card ---------------------------------------------------
+
+function MessageScoreCard({ score }: { score: MessageScore }) {
+  const scoreColor =
+    score.score >= 65 ? "text-green-500 bg-green-500/10 border-green-500/30"
+    : score.score >= 40 ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/30"
+    : "text-destructive bg-destructive/10 border-destructive/30";
+
+  const recColor =
+    score.recommendation === "respond" ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
+    : score.recommendation === "inquire" ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+    : "border-destructive/30 bg-destructive/10 text-destructive";
+
+  const recLabel =
+    score.recommendation === "respond" ? "Respond"
+    : score.recommendation === "inquire" ? "Inquire first"
+    : "Pass";
+
+  const alignmentColor =
+    score.roleAlignment === "strong" ? "text-green-500"
+    : score.roleAlignment === "moderate" ? "text-yellow-500"
+    : "text-destructive";
+
+  return (
+    <div className="space-y-4">
+      {/* Score + badges */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold ${scoreColor}`}>
+          {score.score}/100
+        </span>
+        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${recColor}`}>
+          {recLabel}
+        </span>
+        <span className={`text-xs font-medium ${alignmentColor}`}>
+          {score.roleAlignment.charAt(0).toUpperCase() + score.roleAlignment.slice(1)} alignment
+        </span>
+        {score.isContract && <Badge variant="destructive" className="text-xs">Contract</Badge>}
+        {score.isStaffingAgency && <Badge variant="destructive" className="text-xs">Staffing agency</Badge>}
+        {!score.locationMatch && <Badge variant="secondary" className="text-xs">Location mismatch</Badge>}
+      </div>
+
+      <p className="text-sm italic text-muted-foreground">{score.verdict}</p>
+      <p className="text-sm leading-relaxed">{score.recommendationReason}</p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {score.signals.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-500">Positive signals</p>
+            <ul className="space-y-1">
+              {score.signals.map((s, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500/60" />
+                  {s}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {score.redFlags.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Red flags</p>
+            <ul className="space-y-1">
+              {score.redFlags.map((f, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive/60" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -553,13 +629,39 @@ export default function RecruiterPage() {
   const [showResponse, setShowResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analyzed, setAnalyzed] = useState(false);
+  const [messageScore, setMessageScore] = useState<MessageScore | null>(null);
   const [thread, setThread] = useState<ThreadMsg[]>([]);
   const [replyInput, setReplyInput] = useState("");
+
+  const sendJdChat = useCallback(async () => {
+    const q = chatInput.trim();
+    if (!q || chatLoading || !jdAnalysis) return;
+    const newHistory = [...chatHistory, { role: "user" as const, content: q }];
+    setChatHistory(newHistory);
+    setChatInput("");
+    setChatLoading(true);
+    try {
+      const res = await fetch("/api/jd-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, analysis: jdAnalysis, jdText, history: chatHistory }),
+      });
+      const answer = await consumeSSE(res, (_, acc) => {
+        setChatHistory([...newHistory, { role: "assistant", content: acc }]);
+      });
+      setChatHistory([...newHistory, { role: "assistant", content: answer }]);
+    } catch {
+      setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatInput, chatLoading, jdAnalysis, jdText, chatHistory]);
 
   const resetConversation = () => {
     setThread([]);
     setAnalyzed(false);
     setJdAnalysis(null);
+    setMessageScore(null);
     setResponseContext("");
     setMessage("");
     setReplyInput("");
@@ -575,6 +677,7 @@ export default function RecruiterPage() {
     setAnalyzing(true);
     setError(null);
     setJdAnalysis(null);
+    setMessageScore(null);
     setAnalyzed(false);
     setShowResponse(false);
     setChatHistory([]);
@@ -605,6 +708,16 @@ export default function RecruiterPage() {
         if (data.error) throw new Error(data.error);
         setJdAnalysis(data.analysis);
         baseContext = data.analysis.summary ?? msgToAnalyze;
+      } else {
+        // No JD — score the message itself against profile/goals
+        const res = await fetch("/api/message-score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msgToAnalyze }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setMessageScore(data.score);
       }
 
       if (threadSnapshot.length > 0) {
@@ -834,7 +947,7 @@ export default function RecruiterPage() {
 
           {analyzed && !analyzing && (
             <>
-              {/* JD analysis */}
+              {/* JD analysis or message score */}
               {jdAnalysis ? (
                 <Card className="border-border/60 bg-card/60">
                   <CardHeader className="pb-3">
@@ -844,15 +957,20 @@ export default function RecruiterPage() {
                     <JDResults analysis={jdAnalysis} />
                   </CardContent>
                 </Card>
-              ) : (
+              ) : messageScore ? (
                 <Card className="border-border/60 bg-card/60">
-                  <CardContent className="pt-5 pb-4">
-                    <p className="text-sm text-muted-foreground">
-                      No JD provided. Add a job description to get a full fit assessment against your goals and preferences.
-                    </p>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Message Assessment</CardTitle>
+                      <span className="text-xs text-muted-foreground">No JD — scored on message signals</span>
+                    </div>
+                    <CardDescription>How well this recruiter message aligns with your goals and profile.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <MessageScoreCard score={messageScore} />
                   </CardContent>
                 </Card>
-              )}
+              ) : null}
 
               {/* JD follow-up chat */}
               {jdAnalysis && (
@@ -916,50 +1034,23 @@ export default function RecruiterPage() {
                       </div>
                     )}
 
-                    {(() => {
-                      const sendChat = async () => {
-                        const q = chatInput.trim();
-                        if (!q || chatLoading || !jdAnalysis) return;
-                        const newHistory = [...chatHistory, { role: "user" as const, content: q }];
-                        setChatHistory(newHistory);
-                        setChatInput("");
-                        setChatLoading(true);
-                        try {
-                          const res = await fetch("/api/jd-chat", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ question: q, analysis: jdAnalysis, jdText, history: chatHistory }),
-                          });
-                          const answer = await consumeSSE(res, (_, acc) => {
-                            setChatHistory([...newHistory, { role: "assistant", content: acc }]);
-                          });
-                          setChatHistory([...newHistory, { role: "assistant", content: answer }]);
-                        } catch {
-                          setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
-                        } finally {
-                          setChatLoading(false);
-                        }
-                      };
-                      return (
-                        <div className="flex gap-2">
-                          <input
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-                            placeholder="How did you know this was a contract role?"
-                            disabled={chatLoading}
-                            className="flex-1 rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow disabled:opacity-50"
-                          />
-                          <button
-                            disabled={!chatInput.trim() || chatLoading}
-                            onClick={sendChat}
-                            className="rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
-                          >
-                            <Send size={14} />
-                          </button>
-                        </div>
-                      );
-                    })()}
+                    <div className="flex gap-2">
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendJdChat(); } }}
+                        placeholder="How did you know this was a contract role?"
+                        disabled={chatLoading}
+                        className="flex-1 rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.6_0.2_280/40%)] transition-shadow disabled:opacity-50"
+                      />
+                      <button
+                        disabled={!chatInput.trim() || chatLoading}
+                        onClick={sendJdChat}
+                        className="rounded-lg bg-[oklch(0.6_0.2_280)] text-white px-3 py-2 hover:bg-[oklch(0.55_0.2_280)] disabled:opacity-50 transition-colors"
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
 
                     {chatHistory.length > 0 && (
                       <button onClick={() => setChatHistory([])} className="text-xs text-muted-foreground hover:text-foreground transition-colors">

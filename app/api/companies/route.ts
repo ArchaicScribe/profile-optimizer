@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "../../../infrastructure/db/PrismaClient";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
-import { extractJson } from "../../../lib/extractJson";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -23,8 +23,7 @@ export async function GET() {
 
     return Response.json({ cards });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to load company cards";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "Failed to load company cards");
   }
 }
 
@@ -69,8 +68,7 @@ Return JSON with this exact structure:
 Be specific to ${trimmedCompany}. Do not give generic SE/SA interview advice.`;
 
     const claude = ClaudeClient.getInstance();
-
-    const parsed = extractJson(await claude.complete(systemPrompt, userMessage));
+    const parsed = await claude.completeJson(systemPrompt, userMessage);
 
     const saved = await prisma.companyCard.upsert({
       where: { company: trimmedCompany },
@@ -85,7 +83,6 @@ Be specific to ${trimmedCompany}. Do not give generic SE/SA interview advice.`;
       rawData: JSON.parse(saved.rawData),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate company card";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "Failed to generate company card");
   }
 }

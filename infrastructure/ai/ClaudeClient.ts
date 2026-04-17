@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
+import { extractJson } from "../../lib/extractJson";
 
 // Configure global proxy for Node.js fetch (used by Anthropic SDK) if running in
 // a sandboxed environment that requires egress routing through a proxy.
@@ -87,6 +88,12 @@ export class ClaudeClient {
       messages,
     });
     return this.extractText(response.content);
+  }
+
+  /** Convenience: complete() + JSON extraction. Returns a typed parsed object. */
+  async completeJson<T>(systemPrompt: string, userMessage: string, maxTokens = 4096): Promise<T> {
+    const text = await this.complete(systemPrompt, userMessage, maxTokens);
+    return extractJson(text) as T;
   }
 
   async completeWithTools<T>(

@@ -38,6 +38,21 @@ export interface AuditResult {
   }>;
 }
 
+// ---- Message Score ---------------------------------------------------------
+
+export interface MessageScore {
+  score: number;
+  verdict: string;
+  roleAlignment: "strong" | "moderate" | "weak";
+  isContract: boolean;
+  isStaffingAgency: boolean;
+  locationMatch: boolean;
+  signals: string[];
+  redFlags: string[];
+  recommendation: "respond" | "inquire" | "pass";
+  recommendationReason: string;
+}
+
 // ---- JD Analysis -----------------------------------------------------------
 
 export interface JDAnalysis {

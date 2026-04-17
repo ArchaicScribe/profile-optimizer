@@ -3,6 +3,7 @@ import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { sseStream } from "../../../lib/sseStream";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -76,8 +77,7 @@ Return valid JSON only:
         2048,
       ),
     );
-  } catch (e) {
-    console.error("[/api/recruiter] outer catch:", e);
-    return Response.json({ error: e instanceof Error ? e.message : "Invalid request" }, { status: 400 });
+  } catch (err) {
+    return apiError(err, "Recruiter analysis failed");
   }
 }

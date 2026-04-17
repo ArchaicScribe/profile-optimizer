@@ -3,6 +3,7 @@ import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
 import { pdfContentBlock } from "../../../lib/pdfToBase64";
 import { sseStream } from "../../../lib/sseStream";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -86,7 +87,7 @@ Return valid JSON only:
     return sseStream(
       claude.streamContent(systemPrompt, [{ role: "user", content: contentBlocks as never }]),
     );
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (err) {
+    return apiError(err, "Resume analysis failed");
   }
 }

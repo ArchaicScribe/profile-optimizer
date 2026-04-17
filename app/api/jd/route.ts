@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
-import { extractJson } from "../../../lib/extractJson";
 import { getGoalsContext } from "../../../infrastructure/db/getUserConfig";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,11 +65,9 @@ Hard rules for recommendation:
 - "apply" only if fitScore >= 65 and no hard disqualifiers`;
 
     const claude = ClaudeClient.getInstance();
-
-    const text = await claude.complete(SYSTEM_PROMPT, userMessage);
-    return Response.json({ analysis: extractJson(text) });
+    const analysis = await claude.completeJson(SYSTEM_PROMPT, userMessage);
+    return Response.json({ analysis });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Analysis failed";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "JD analysis failed");
   }
 }

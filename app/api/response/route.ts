@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { ClaudeClient } from "../../../infrastructure/ai/ClaudeClient";
+import { apiError } from "../../../lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -96,7 +97,6 @@ export async function POST(req: NextRequest) {
     const message = await claude.complete(SYSTEM_PROMPT, userMessage);
     return Response.json({ message: message.trim() });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate response";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err, "Failed to generate response");
   }
 }
